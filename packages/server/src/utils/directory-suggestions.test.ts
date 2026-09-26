@@ -24,13 +24,15 @@ const isWindows = isPlatform("win32");
 const filesystemRootDirectoryName = isWindows ? "Windows" : "usr";
 async function searchAbsoluteDirectoryPaths(options: {
   homeDir: string;
+  searchRoots?: string[];
   query: string;
   limit?: number;
   maxDepth?: number;
-  maxDirectoriesScanned?: number;
+  maxEntriesScanned?: number;
 }): Promise<string[]> {
   const entries = await searchDirectoryEntries({
     root: options.homeDir,
+    searchRoots: options.searchRoots,
     query: options.query,
     pathFormat: "absolute",
     includeDirectories: true,
@@ -41,7 +43,7 @@ async function searchAbsoluteDirectoryPaths(options: {
     blankQueryBehavior: "none",
     limit: options.limit,
     maxDepth: options.maxDepth,
-    maxEntriesScanned: options.maxDirectoriesScanned,
+    maxEntriesScanned: options.maxEntriesScanned,
     confidentResultScanThreshold: 5_000,
   });
   return entries.map((entry) => entry.path);
@@ -521,6 +523,153 @@ describe("absolute directory-path configuration", () => {
     rmSync(tempRoot, { recursive: true, force: true });
   });
 
+  it("searches configured roots and ranks exact matches before prefixes across roots", async () => {
+    mkdirSync(path.join(homeDir, "bridge-tools"));
+    mkdirSync(path.join(outsideDir, "bridge"));
+    expect(
+      await searchAbsoluteDirectoryPaths({
+        homeDir,
+        searchRoots: [homeDir, outsideDir],
+        query: "bridge",
+        limit: 1,
+      }),
+    ).toEqual([path.join(outsideDir, "bridge")]);
+  });
+
+  it("deduplicates overlapping roots and skips missing volumes", async () => {
+    const project = path.join(outsideDir, "nested", "bridge");
+    mkdirSync(project, { recursive: true });
+    expect(
+      await searchAbsoluteDirectoryPaths({
+        homeDir,
+        searchRoots: [
+          outsideDir,
+          outsideDir,
+          path.join(outsideDir, "nested"),
+          path.join(tempRoot, "missing"),
+        ],
+        query: "bridge",
+      }),
+    ).toEqual([project]);
+  });
+
+  it("keeps discovery exclusions across roots while honoring an explicitly configured subtree", async () => {
+    const excluded = path.join(homeDir, "Library");
+    const explicitRoot = path.join(excluded, "code");
+    const explicitProject = path.join(explicitRoot, "bridge");
+    const visibleProject = path.join(outsideDir, "bridge");
+    mkdirSync(explicitProject, { recursive: true });
+    mkdirSync(visibleProject);
+    const options = {
+      root: homeDir,
+      query: "bridge",
+      pathFormat: "absolute" as const,
+      pathQueryPolicy: "rooted" as const,
+      excludedDiscoveryPaths: [excluded],
+    };
+    expect(
+      await searchDirectoryEntries({ ...options, searchRoots: [homeDir, outsideDir] }),
+    ).toEqual([{ path: visibleProject, kind: "directory" }]);
+    const entries = await searchDirectoryEntries({
+      ...options,
+      searchRoots: [homeDir, outsideDir, explicitRoot],
+    });
+    expect(entries.map((entry) => entry.path).sort()).toEqual(
+      [explicitProject, visibleProject].sort(),
+    );
+  });
+
+  it.each([".hidden", "node_modules"])("keeps explicit roots under %s", async (name) => {
+    const root = path.join(outsideDir, name, "code");
+    const target = path.join(root, "bridge");
+    mkdirSync(target, { recursive: true });
+    expect(
+      await searchAbsoluteDirectoryPaths({
+        homeDir,
+        query: "bridge",
+        searchRoots: [outsideDir, root],
+      }),
+    ).toEqual([target]);
+  });
+
+  it("keeps explicit roots beyond the parent depth limit", async () => {
+    const root = path.join(outsideDir, "nested");
+    const target = path.join(root, "bridge");
+    mkdirSync(target, { recursive: true });
+    expect(
+      await searchAbsoluteDirectoryPaths({
+        homeDir,
+        query: "bridge",
+        searchRoots: [outsideDir, root],
+        maxDepth: 1,
+      }),
+    ).toEqual([target]);
+  });
+
+  it("does not divide the scan budget for overlapping roots", async () => {
+    const root = path.join(tempRoot, "budget");
+    const nested = path.join(root, "nested");
+    const target = path.join(nested, "bridge");
+    const sibling = path.join(root, "other", "bridge-tools");
+    mkdirSync(target, { recursive: true });
+    mkdirSync(sibling, { recursive: true });
+    const options = { homeDir, query: "bridge", maxEntriesScanned: 4 };
+    const expected = await searchAbsoluteDirectoryPaths({ ...options, searchRoots: [root] });
+    expect(expected).toEqual([target, sibling]);
+    expect(await searchAbsoluteDirectoryPaths({ ...options, searchRoots: [nested, root] })).toEqual(
+      expected,
+    );
+  });
+
+  it("preserves literal backslashes in configured POSIX roots", async () => {
+    if (process.platform === "win32") return;
+    const root = path.join(outsideDir, "team\\alpha");
+    const target = path.join(root, "bridge");
+    mkdirSync(target, { recursive: true });
+    expect(
+      await searchAbsoluteDirectoryPaths({ homeDir, query: "bridge", searchRoots: [root] }),
+    ).toEqual([target]);
+  });
+
+  it("keeps default keywords, tilde browsing, and blank queries scoped to home", async () => {
+    const project = path.join(outsideDir, "bridge");
+    mkdirSync(project);
+    expect(await searchAbsoluteDirectoryPaths({ homeDir, query: "bridge" })).toEqual([]);
+    expect(
+      await searchAbsoluteDirectoryPaths({ homeDir, searchRoots: [outsideDir], query: "~/bridge" }),
+    ).toEqual([]);
+    expect(
+      await searchAbsoluteDirectoryPaths({ homeDir, searchRoots: [outsideDir], query: "" }),
+    ).toEqual([]);
+    expect(
+      await searchAbsoluteDirectoryPaths({ homeDir, searchRoots: [outsideDir], query: "./bridge" }),
+    ).toEqual([]);
+  });
+
+  it("shares a single scan budget across roots without starving the second root", async () => {
+    const left = path.join(tempRoot, "left");
+    const right = path.join(tempRoot, "right");
+    mkdirSync(path.join(left, "bridge-one"), { recursive: true });
+    mkdirSync(path.join(left, "bridge-two"));
+    mkdirSync(path.join(right, "bridge-three"), { recursive: true });
+    expect(
+      await searchAbsoluteDirectoryPaths({
+        homeDir,
+        searchRoots: [left, right],
+        query: "bridge",
+        maxEntriesScanned: 2,
+      }),
+    ).toEqual([path.join(left, "bridge-one"), path.join(right, "bridge-three")]);
+    expect(
+      await searchAbsoluteDirectoryPaths({
+        homeDir,
+        searchRoots: [left, right],
+        query: "bridge",
+        maxEntriesScanned: 0,
+      }),
+    ).toEqual([]);
+  });
+
   it("browses an explicitly named directory outside home", async () => {
     const results = await searchAbsoluteDirectoryPaths({
       homeDir,
@@ -578,7 +727,7 @@ describe("absolute directory-path configuration", () => {
         homeDir,
         query: "documents",
         limit: 10,
-        maxDirectoriesScanned: 0,
+        maxEntriesScanned: 0,
       }),
     ).resolves.toEqual([]);
   });
@@ -598,7 +747,7 @@ describe("absolute directory-path configuration", () => {
       homeDir: budgetHome,
       query: "paseo-desktop",
       limit: 10,
-      maxDirectoriesScanned: 8,
+      maxEntriesScanned: 8,
     });
 
     expect(results.map((result) => realpathSync.native(result))).toEqual([
@@ -625,7 +774,7 @@ describe("absolute directory-path configuration", () => {
       homeDir: symlinkHome,
       query: "paseo-desktop",
       limit: 10,
-      maxDirectoriesScanned: 6,
+      maxEntriesScanned: 6,
     });
 
     expect(results.map((result) => realpathSync.native(result))).toEqual([
