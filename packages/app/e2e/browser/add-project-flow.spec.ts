@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import type { Page } from "@playwright/test";
 import { test, expect } from "../support/fixtures";
 import {
   addProjectFlow,
   addProjectFlowBack,
+  addProjectFlowConfirmDirectory,
   addProjectFlowHost,
   addProjectFlowInput,
   addProjectFlowMethod,
@@ -31,6 +33,17 @@ import { getServerId } from "../support/helpers/server-id";
 
 const SECONDARY_HOST_ID = "add-project-flow-secondary";
 const SECONDARY_HOST_LABEL = "Secondary Host";
+
+function trackAddProjectRequests(page: Page): string[] {
+  const requests: string[] = [];
+  page.on("websocket", (socket) => {
+    socket.on("framesent", ({ payload }) => {
+      const frame = payload.toString();
+      if (frame.includes('"project.add.request"')) requests.push(frame);
+    });
+  });
+  return requests;
+}
 
 async function expectProjectDirectory(pathname: string): Promise<void> {
   await expect.poll(async () => (await stat(pathname)).isDirectory()).toBe(true);
@@ -214,7 +227,7 @@ test.describe("Add Project command-center flow", () => {
     });
   });
 
-  test("keyboard directory search adds the selected Project", async ({
+  test("keyboard directory search browses the selected directory before adding it", async ({
     page,
     projectPickerFixture,
   }) => {
@@ -228,6 +241,11 @@ test.describe("Add Project command-center flow", () => {
       timeout: 30_000,
     });
     await page.keyboard.press("Enter");
+    await expect(addProjectFlowInput(page)).toHaveValue(
+      `${projectPickerFixture.projectPath}${path.sep}`,
+    );
+    await expectAddProjectPage(page, "directory-search");
+    await page.keyboard.press("ControlOrMeta+Enter");
 
     const projectId = await expectOpenedProject(page, projectPickerFixture.projectName);
     projectPickerFixture.rememberProjectId(projectId);
@@ -238,6 +256,111 @@ test.describe("Add Project command-center flow", () => {
       projectPath: projectPickerFixture.projectPath,
     });
     await expectProjectHasNoWorkspaces(projectId);
+  });
+
+  test("an empty directory is added only by explicit shortcut confirmation", async ({ page }) => {
+    const parent = await mkdtemp(path.join(tmpdir(), "paseo-e2e-confirm-directory-"));
+    const projectName = "empty-project";
+    const projectPath = path.join(parent, projectName);
+    await mkdir(projectPath);
+    let projectId: string | null = null;
+    const addRequests = trackAddProjectRequests(page);
+
+    try {
+      await gotoAppShell(page);
+      await openAddProjectFlow(page);
+      await chooseAddProjectMethod(page, "directory-search");
+      await addProjectFlowInput(page).fill(`${projectPath}${path.sep}`);
+      await expect(page.getByTestId("add-project-flow-empty")).toBeVisible();
+      await page.keyboard.press("Enter");
+      await expectAddProjectPage(page, "directory-search");
+      expect(addRequests).toHaveLength(0);
+
+      await page.keyboard.press("ControlOrMeta+Enter");
+
+      projectId = await expectOpenedProject(page, projectName);
+      expect(addRequests).toHaveLength(1);
+      await expectNewWorkspaceForAddedProject(page, {
+        serverId: getServerId(),
+        projectId,
+        projectName,
+        projectPath,
+      });
+    } finally {
+      await removeCreatedProject(projectPath, projectId);
+      await rm(parent, { recursive: true, force: true });
+    }
+  });
+
+  test("an empty directory is added only by explicit focused button confirmation", async ({
+    page,
+  }) => {
+    const parent = await mkdtemp(path.join(tmpdir(), "paseo-e2e-confirm-directory-"));
+    const projectName = "empty-project";
+    const projectPath = path.join(parent, projectName);
+    await mkdir(projectPath);
+    let projectId: string | null = null;
+    const addRequests = trackAddProjectRequests(page);
+
+    try {
+      await gotoAppShell(page);
+      await openAddProjectFlow(page);
+      await chooseAddProjectMethod(page, "directory-search");
+      await addProjectFlowInput(page).fill(`${projectPath}${path.sep}`);
+      await expect(page.getByTestId("add-project-flow-empty")).toBeVisible();
+      await page.keyboard.press("Enter");
+      await expectAddProjectPage(page, "directory-search");
+      expect(addRequests).toHaveLength(0);
+
+      await page.keyboard.press("Tab");
+      await expect(addProjectFlowConfirmDirectory(page)).toBeFocused();
+      await page.keyboard.press("Enter");
+
+      projectId = await expectOpenedProject(page, projectName);
+      expect(addRequests).toHaveLength(1);
+      await expectNewWorkspaceForAddedProject(page, {
+        serverId: getServerId(),
+        projectId,
+        projectName,
+        projectPath,
+      });
+    } finally {
+      await removeCreatedProject(projectPath, projectId);
+      await rm(parent, { recursive: true, force: true });
+    }
+  });
+
+  test("browsing and adding preserves a literal trailing backslash in a POSIX directory", async ({
+    page,
+  }) => {
+    test.skip(process.platform === "win32", "Backslashes are directory separators on Windows");
+    const parent = await mkdtemp(path.join(tmpdir(), "paseo-e2e-literal-backslash-"));
+    const projectName = "team\\";
+    const projectPath = path.join(parent, projectName);
+    await mkdir(projectPath);
+    await mkdir(path.join(parent, "team"));
+    let projectId: string | null = null;
+
+    try {
+      await gotoAppShell(page);
+      await openAddProjectFlow(page);
+      await chooseAddProjectMethod(page, "directory-search");
+      await addProjectFlowInput(page).fill(`${parent}${path.sep}`);
+      await addProjectFlow(page).getByText(projectPath, { exact: true }).click();
+      await expect(addProjectFlowInput(page)).toHaveValue(`${projectPath}${path.sep}`);
+      await addProjectFlowConfirmDirectory(page).click();
+
+      projectId = await expectOpenedProject(page, projectName);
+      await expectNewWorkspaceForAddedProject(page, {
+        serverId: getServerId(),
+        projectId,
+        projectName,
+        projectPath,
+      });
+    } finally {
+      await removeCreatedProject(projectPath, projectId);
+      await rm(parent, { recursive: true, force: true });
+    }
   });
 
   test("a complete repository URL remains selectable without a GitHub search result", async ({
@@ -273,6 +396,7 @@ test.describe("Add Project command-center flow", () => {
       await gotoAppShell(page);
       await openAddProjectFlow(page);
       await chooseAddProjectMethod(page, "new-directory");
+      await expect(addProjectFlowInput(page)).toBeFocused();
 
       await page.keyboard.type(parentDirectory);
       await page.keyboard.press("Enter");
