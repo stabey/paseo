@@ -5055,6 +5055,7 @@ export class Session {
         query,
         pathFormat: searchesWorkspace ? "relative" : "absolute",
         pathQueryPolicy: searchesWorkspace ? "slashes" : "rooted",
+        absolutePathPolicy: searchesWorkspace ? "within-root" : "browse",
         blankQueryBehavior: searchesWorkspace ? "children" : "none",
         rootAliases: searchesWorkspace ? [] : ["~"],
         traversableHiddenDirectoryNames: searchesWorkspace
