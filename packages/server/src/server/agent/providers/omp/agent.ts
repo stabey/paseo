@@ -138,6 +138,7 @@ export interface OmpAgentClientOptions {
 }
 
 export interface OmpProviderIdleScheduler {
+  now(): number;
   waitForRetry(): Promise<void>;
 }
 
@@ -220,6 +221,7 @@ interface OmpAgentSessionOptions {
 
 function createOmpProviderIdleScheduler(): OmpProviderIdleScheduler {
   return {
+    now: () => Date.now(),
     waitForRetry: async () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
     },
@@ -2185,9 +2187,9 @@ export class OmpAgentSession implements AgentSession {
     turnId: string | undefined,
     messages: OmpAgentMessage[],
   ): Promise<void> {
-    const deadline = Date.now() + this.providerIdleDeadlineMs;
+    const deadline = this.providerIdleScheduler.now() + this.providerIdleDeadlineMs;
     while (!this.closed && this.activeTurnStarted && this.currentTurnIdForEvent() === turnId) {
-      if (Date.now() >= deadline) {
+      if (this.providerIdleScheduler.now() >= deadline) {
         this.usagePoller.stopTurn();
         this.resetActiveTurn({ terminalizeWork: true });
         this.emit({
