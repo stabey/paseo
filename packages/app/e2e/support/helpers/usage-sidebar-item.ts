@@ -6,6 +6,7 @@ import type { UsageReportEntry } from "@getpaseo/protocol/messages";
 import { expect, type Locator, type Page } from "@playwright/test";
 import { connectNewWorkspaceDaemonClient } from "./new-workspace";
 import { pluginRequirements } from "./plugin-fixture";
+import { waitForSettledPosition } from "./sheet-layout";
 
 /** Real usage-source plugin; its long report exercises the sheet's scrolling boundary. */
 export async function installTallUsageSource() {
@@ -178,7 +179,11 @@ export async function togglePin(scope: Locator, source: string, window: string) 
 /** The usage title row's options menu: Refresh and Used/Remaining. */
 export async function openUsageOptions(page: Page): Promise<void> {
   await page.locator('[data-testid="usage-options-menu"]:visible').first().click();
-  await expect(page.getByTestId("usage-display-used")).toBeVisible();
+  const option = page.getByTestId("usage-display-used");
+  // A sheet can be visible below the viewport while its opening animation is
+  // still pending. Backdrop clicks must wait until it can be interacted with.
+  await expect(option).toBeInViewport();
+  await waitForSettledPosition(option);
 }
 
 export async function showUsageAs(page: Page, displayAs: "used" | "remaining") {
