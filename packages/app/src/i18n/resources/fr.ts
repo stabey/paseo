@@ -1562,6 +1562,11 @@ export const fr: TranslationResources = {
     details: "Détails",
   },
   startup: {
+    continueWithoutServer: "Continuer sans serveur local",
+    continueWithoutServerDescription:
+      "Désactivez le démarrage automatique du serveur local et connectez-vous à un hôte existant. Vous pourrez réactiver le daemon intégré dans les paramètres.",
+    continueWithoutServerFailed:
+      "Impossible d’enregistrer le paramètre du serveur local : {{message}}",
     errorTitle: "Une erreur s’est produite",
     errorDescription:
       "Le serveur local n’a pas pu démarrer. Si le problème persiste, signalez-le sur GitHub en joignant les journaux ci-dessous.",
