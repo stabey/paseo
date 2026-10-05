@@ -1643,6 +1643,8 @@ export const en = {
     },
   },
   onboarding: {
+    localDaemonHint:
+      "Run agents on this computer. Paseo starts the daemon when you open the app. Quit behavior can be changed in Settings.",
     title: "Welcome to Paseo",
     subtitle: "Connect your computer to get started",
     actions: {
@@ -1710,6 +1712,14 @@ export const en = {
     },
   },
   pairing: {
+    localDiscovery: {
+      title: "Local daemons",
+      searching: "Searching this computer…",
+      empty: "No local daemon found. You can still enter an address below.",
+      failed: "Could not search for local daemons. Enter an address or try again.",
+      refresh: "Refresh",
+      passwordRequired: "Password required",
+    },
     hostPassword: {
       title: "Password for {{host}}",
       label: "Host password",
