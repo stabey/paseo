@@ -1652,6 +1652,8 @@ export const ru: TranslationResources = {
     },
   },
   onboarding: {
+    localDaemonHint:
+      "Запускайте агентов на этом компьютере. Paseo запускает демон при открытии приложения. Поведение при выходе можно изменить в настройках.",
     title: "Добро пожаловать в Paseo",
     subtitle: "Подключите компьютер, чтобы начать",
     actions: {
@@ -1719,6 +1721,14 @@ export const ru: TranslationResources = {
     },
   },
   pairing: {
+    localDiscovery: {
+      title: "Локальные демоны",
+      searching: "Поиск на этом компьютере…",
+      empty: "Локальный демон не найден. Вы можете ввести адрес ниже.",
+      failed: "Не удалось найти локальные демоны. Введите адрес или повторите попытку.",
+      refresh: "Обновить",
+      passwordRequired: "Требуется пароль",
+    },
     hostPassword: {
       title: "Пароль для {{host}}",
       label: "Пароль хоста",
