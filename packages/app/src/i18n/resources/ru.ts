@@ -1660,8 +1660,6 @@ export const ru: TranslationResources = {
     },
   },
   onboarding: {
-    localDaemonHint:
-      "Запускайте агентов на этом компьютере. Paseo запускает демон при открытии приложения. Поведение при выходе можно изменить в настройках.",
     title: "Добро пожаловать в Paseo",
     subtitle: "Подключите компьютер, чтобы начать",
     actions: {

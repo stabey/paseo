@@ -197,6 +197,7 @@ function draftFromConnectionUri(uri: string): DirectConnectionDraft {
 
 export interface AddHostModalProps {
   visible: boolean;
+  initialTarget?: { host: string; port: number };
   onClose: () => void;
   onCancel?: () => void;
   onSaved?: (result: {
@@ -207,11 +208,18 @@ export interface AddHostModalProps {
   }) => void;
 }
 
-export function AddHostModal({ visible, onClose, onCancel, onSaved }: AddHostModalProps) {
+export function AddHostModal({
+  visible,
+  onClose,
+  onCancel,
+  onSaved,
+  initialTarget,
+}: AddHostModalProps) {
   return (
     <AddHostModalContent
       key={String(visible)}
       visible={visible}
+      initialTarget={initialTarget}
       onClose={onClose}
       onCancel={onCancel}
       onSaved={onSaved}
@@ -219,7 +227,13 @@ export function AddHostModal({ visible, onClose, onCancel, onSaved }: AddHostMod
   );
 }
 
-function AddHostModalContent({ visible, onClose, onCancel, onSaved }: AddHostModalProps) {
+function AddHostModalContent({
+  visible,
+  onClose,
+  onCancel,
+  onSaved,
+  initialTarget,
+}: AddHostModalProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const daemons = useHosts();
@@ -229,8 +243,8 @@ function AddHostModalContent({ visible, onClose, onCancel, onSaved }: AddHostMod
 
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [host, setHost] = useState("");
-  const [port, setPort] = useState("6767");
+  const [host, setHost] = useState(initialTarget?.host ?? "");
+  const [port, setPort] = useState(String(initialTarget?.port ?? 6767));
   const [useTls, setUseTls] = useState(false);
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
