@@ -1,0 +1,27 @@
+{"level":"info","time":"2026-10-07T13:27:11.971Z","pid":83449,"name":"DaemonRunner","msg":"Starting daemon worker (IPC restart and crash restart enabled)"}
+{"level":"info","time":"2026-10-07T13:27:11.972Z","pid":83449,"name":"DaemonRunner","msg":"Spawning worker","workerEntry":"<test-checkouts>/source/packages/server/dist/server/server/daemon-worker.js"}
+(node:83451) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `Electron --trace-deprecation ...` to show where the warning was created)
+{"level":30,"time":1791379632866,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","module":"daemon-keypair","filePath":"<test-checkouts>/evidence/latest-baseline-5yaeHI/desktop-home/daemon-keypair.json","msg":"Saved daemon keypair"}
+{"level":30,"time":1791379632874,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","module":"web-ui","enabled":false,"hasDistDir":true,"msg":"Daemon web UI disabled or missing dist directory"}
+{"level":30,"time":1791379632884,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","elapsed":"22ms","msg":"Agent storage initialized"}
+{"level":30,"time":1791379632884,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","projectsFile":"<test-checkouts>/evidence/latest-baseline-5yaeHI/desktop-home/projects/projects.json","workspacesFile":"<test-checkouts>/evidence/latest-baseline-5yaeHI/desktop-home/projects/workspaces.json","materializedProjects":0,"materializedWorkspaces":0,"msg":"Workspace registries bootstrapped from existing agent storage"}
+{"level":30,"time":1791379632889,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","elapsed":"28ms","msg":"Workspace registries bootstrapped"}
+{"level":30,"time":1791379632891,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","elapsed":"29ms","msg":"Schedule service initialized"}
+{"level":30,"time":1791379632891,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","elapsed":"29ms","msg":"Loading persisted agent registry"}
+{"level":30,"time":1791379632891,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","elapsed":"29ms","msg":"Agent registry loaded (0 records); agents will initialize on demand"}
+{"level":30,"time":1791379632891,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","msg":"Voice mode configured for agent-scoped resume flow (no dedicated voice assistant provider)"}
+{"level":30,"time":1791379632891,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","elapsed":"29ms","msg":"Preparing voice and MCP runtime"}
+{"level":30,"time":1791379632891,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","route":"/mcp/agents","enabled":true,"msg":"Agent MCP route mounted"}
+{"level":30,"time":1791379632891,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","module":"speech-runtime","requestedProviders":{"dictationStt":{"provider":"local","enabled":false,"explicit":false},"voiceTurnDetection":{"provider":"local","enabled":false,"explicit":false},"voiceStt":{"provider":"local","enabled":false,"explicit":false},"voiceTts":{"provider":"local","enabled":false,"explicit":false}},"availability":{"openai":{"stt":false,"tts":false,"dictationStt":false}},"msg":"Speech provider reconciliation started"}
+{"level":30,"time":1791379632891,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","elapsed":"29ms","msg":"Speech service created"}
+{"level":30,"time":1791379632891,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","module":"bootstrap","elapsed":"29ms","msg":"Bootstrap complete, ready to start listening"}
+{"level":60,"time":1791379632893,"pid":83451,"hostname":"test-host","daemonVersion":"0.11.0-beta.5","err":{"type":"Error","message":"listen EADDRINUSE: address already in use 127.0.0.1:58981","stack":"Error: listen EADDRINUSE: address already in use 127.0.0.1:58981\n    at Server.setupListenHandle [as _listen2] (node:net:2324:16)\n    at listenInCluster (node:net:2433:12)\n    at node:net:2662:7\n    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)","code":"EADDRINUSE","errno":-48,"syscall":"listen","address":"127.0.0.1","port":58981},"msg":"Daemon failed to start listening"}
+Error: listen EADDRINUSE: address already in use 127.0.0.1:58981
+    at Server.setupListenHandle [as _listen2] (node:net:2324:16)
+    at listenInCluster (node:net:2433:12)
+    at node:net:2662:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+{"level":"info","time":"2026-10-07T13:27:13.106Z","pid":83449,"name":"DaemonRunner","msg":"Worker IPC channel disconnected"}
+{"level":"info","time":"2026-10-07T13:27:13.115Z","pid":83449,"name":"DaemonRunner","msg":"Worker exited","code":1,"signal":null,"exit":"code 1"}
+{"level":"info","time":"2026-10-07T13:27:13.115Z","pid":83449,"name":"DaemonRunner","msg":"Worker exited before successful readiness (code 1). Supervisor exiting."}

@@ -1,0 +1,13 @@
+
+> @getpaseo/desktop@0.11.0-beta.5 test
+> install-electron && vitest run --exclude "e2e/**" src/settings/desktop-settings.test.ts src/daemon/local-daemon-candidates.test.ts src/daemon/daemon-manager.test.ts src/daemon/quit-lifecycle.test.ts
+
+
+ RUN  v4.1.7 <test-checkouts>/source/packages/desktop
+
+
+ Test Files  4 passed (4)
+      Tests  35 passed (35)
+   Start at  21:23:03
+   Duration  854ms (transform 245ms, setup 0ms, import 464ms, tests 556ms, environment 0ms)
+

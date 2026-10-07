@@ -1,0 +1,13 @@
+
+> @getpaseo/app@0.11.0-beta.5 test
+> vitest run --project unit src/runtime/daemon-start-service.test.ts src/navigation/host-runtime-bootstrap.test.ts src/i18n/resources.test.ts src/desktop/daemon/daemon-management-toggle.test.ts
+
+
+ RUN  v4.1.7 <test-checkouts>/source/packages/app
+
+
+ Test Files  4 passed (4)
+      Tests  101 passed (101)
+   Start at  21:21:36
+   Duration  4.29s (transform 3.80s, setup 56ms, import 4.42s, tests 360ms, environment 1ms)
+

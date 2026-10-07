@@ -1,0 +1,2 @@
+PASS: automatic reuse across homes without spawning or owning a daemon; original auto-start and quit lifecycle preserved; password form and saved password work; explicit disable persists; unrelated HTTP services are ignored; startup errors and settings-write failures remain recoverable.
+Packaged app evidence: <test-checkouts>/evidence/latest-packaged-ifo2pt

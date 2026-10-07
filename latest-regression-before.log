@@ -1,0 +1,47 @@
+
+> @getpaseo/app@0.11.0-beta.5 test
+> vitest run --project unit src/runtime/daemon-start-service.test.ts -t reuses a discovered local daemon
+
+
+ RUN  v4.1.7 <test-checkouts>/upstream-baseline-8ddeb79c8/packages/app
+
+ ❯ |unit| src/runtime/daemon-start-service.test.ts (23 tests | 1 failed | 22 skipped) 4ms
+     × reuses a discovered local daemon without starting the bundled daemon 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| src/runtime/daemon-start-service.test.ts > DaemonStartService > reuses a discovered local daemon without starting the bundled daemon
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array []
+
+
+Number of calls: 1
+
+ ❯ src/runtime/daemon-start-service.test.ts:84:23
+     82|     });
+     83|     expect(await service.start()).toEqual({ ok: true });
+     84|     expect(start).not.toHaveBeenCalled();
+       |                       ^
+     85|     expect(fake.upserts).toEqual([
+     86|       { listenAddress: "127.0.0.1:6767", serverId: "srv_existing", hos…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 22 skipped (23)
+   Start at  21:27:19
+   Duration  693ms (transform 422ms, setup 18ms, import 555ms, tests 4ms, environment 0ms)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path <test-checkouts>/upstream-baseline-8ddeb79c8/packages/app
+npm error workspace @getpaseo/app@0.11.0-beta.5
+npm error location <test-checkouts>/upstream-baseline-8ddeb79c8/packages/app
+npm error command failed
+npm error command sh -c vitest run --project unit src/runtime/daemon-start-service.test.ts -t 'reuses a discovered local daemon'

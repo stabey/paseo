@@ -1,0 +1,10 @@
+{
+  "mode": "baseline",
+  "repo": "upstream-baseline-8ddeb79c8",
+  "version": "0.11.0-beta.5",
+  "listen": "127.0.0.1:58981",
+  "externalPidBeforeLaunch": 83284,
+  "externalPidAfterQuit": 83284,
+  "healthAfterQuit": 200,
+  "outcome": "EADDRINUSE error blocks Settings and Direct connection"
+}
