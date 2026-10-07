@@ -1,0 +1,43 @@
+
+ RUN  v4.1.7 <test-checkouts>/source/packages/app
+
+ ❯ |unit| src/desktop/daemon/daemon-management-toggle.test.ts (11 tests | 1 failed) 6ms
+       × preserves the startup error when disabling automatic startup also fails 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| src/desktop/daemon/daemon-management-toggle.test.ts > executeDaemonManagementToggle > enable path (currentlyManaging: false) > preserves the startup error when disabling automatic startup also fails
+AssertionError: expected Error: settings disk is read-only to match object { errors: [ …(2) ], …(1) }
+
+- Expected
++ Received
+
+- {
+-   "errors": [
+  Error {
+-       "message": "listen EADDRINUSE: 127.0.0.1:6767",
+-     },
+-     Error {
+    "message": "settings disk is read-only",
+-     },
+-   ],
+-   "message": "listen EADDRINUSE: 127.0.0.1:6767
+- Automatic startup could not be disabled: settings disk is read-only. It remains enabled and may fail again on the next launch.",
+  }
+
+ ❯ src/desktop/daemon/daemon-management-toggle.test.ts:73:68
+     71|       });
+     72|
+     73|       await expect(executeDaemonManagementToggle(false, null, deps)).r…
+       |                                                                    ^
+     74|         errors: [startupError, settingsError],
+     75|         message:
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (11)
+   Start at  22:23:06
+   Duration  190ms (transform 36ms, setup 32ms, import 17ms, tests 6ms, environment 0ms)
+

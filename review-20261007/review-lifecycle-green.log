@@ -1,0 +1,31 @@
+
+> @getpaseo/desktop@0.11.0-beta.5 test:e2e:lifecycle
+> npm run build:main && node ./e2e/daemon-lifecycle.e2e.mjs
+
+
+> @getpaseo/desktop@0.11.0-beta.5 build:main
+> tsc -p tsconfig.json
+
+PASS: automatic reuse across homes without spawning or owning a daemon; original auto-start and quit lifecycle preserved; password form and saved password work; explicit disable persists; unrelated HTTP services are ignored; startup errors and settings-write failures remain recoverable.
+Desktop command: patch_desktop_settings
+Desktop command: start_desktop_daemon
+Desktop command: stop_desktop_daemon (quit)
+Desktop command: stop_desktop_daemon (settings)
+Desktop command: stop_desktop_daemon (app_update)
+Desktop command: stop_desktop_daemon (host_remove)
+Desktop command: stop_desktop_daemon (version_mismatch)
+Desktop command: restart_desktop_daemon
+Desktop command: stop_desktop_daemon (manual_ipc)
+Desktop command: stop_desktop_daemon (manual_ipc)
+Desktop command: start_desktop_daemon
+Desktop command: patch_desktop_settings
+Desktop command: start_desktop_daemon
+Desktop command: stop_desktop_daemon (quit)
+Desktop command: stop_desktop_daemon (manual_ipc)
+Desktop command: start_desktop_daemon
+Desktop command: stop_desktop_daemon (quit)
+Desktop command: start_desktop_daemon
+Desktop command: stop_desktop_daemon (quit)
+PASS: Desktop readiness deadline returns starting and preserves its owned slow launch.
+PASS: attached legacy daemon survives automatic actions; explicit captured stop, owned launch, managed settings, worker restart, and next-session attachment.
+Lifecycle artifacts: <test-checkouts>/evidence/review-password-after

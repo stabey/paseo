@@ -1,0 +1,45 @@
+
+ RUN  v4.1.7 <test-checkouts>/source/packages/app
+
+stderr | src/runtime/host-runtime.test.ts
+[DraftStore] Attachment garbage collection failed Error: IndexedDB is unavailable in this runtime.
+    at ensureIndexedDb (<test-checkouts>/source/packages/app/src/attachments/web/indexeddb-attachment-store.ts:27:11)
+    at <test-checkouts>/source/packages/app/src/attachments/web/indexeddb-attachment-store.ts:34:21
+    at new Promise (<anonymous>)
+    at openAttachmentDb (<test-checkouts>/source/packages/app/src/attachments/web/indexeddb-attachment-store.ts:33:10)
+    at Object.garbageCollect (<test-checkouts>/source/packages/app/src/attachments/web/indexeddb-attachment-store.ts:192:24)
+    at <test-checkouts>/source/packages/app/src/attachments/service.ts:188:17
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+ ❯ |unit| src/runtime/host-runtime.test.ts (95 tests | 1 failed | 94 skipped) 10ms
+     × keeps a discovered daemon separate from a saved host using the same endpoint 10ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| src/runtime/host-runtime.test.ts > HostRuntimeStore > keeps a discovered daemon separate from a saved host using the same endpoint
+AssertionError: expected [ 'srv_new_home' ] to deeply equal [ 'srv_old_home', 'srv_new_home' ]
+
+- Expected
++ Received
+
+  [
+-   "srv_old_home",
+    "srv_new_home",
+  ]
+
+ ❯ src/runtime/host-runtime.test.ts:3518:61
+    3516|       });
+    3517|
+    3518|       expect(store.getHosts().map((host) => host.serverId)).toEqual([
+       |                                                             ^
+    3519|         "srv_old_home",
+    3520|         "srv_new_home",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 94 skipped (95)
+   Start at  22:44:24
+   Duration  4.24s (transform 3.42s, setup 20ms, import 4.09s, tests 10ms, environment 0ms)
+

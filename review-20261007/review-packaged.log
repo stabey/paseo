@@ -1,0 +1,2 @@
+PASS: automatic reuse across homes without spawning or owning a daemon; reused ports preserve old host identities and credentials; password form works with saved online/offline hosts and can be dismissed; saved passwords reconnect without prompting; original auto-start and quit lifecycle preserved; explicit disable persists; unrelated HTTP services are ignored; startup errors and settings-write failures remain recoverable.
+Packaged app evidence: <test-checkouts>/evidence/review-packaged-mvyoIF
