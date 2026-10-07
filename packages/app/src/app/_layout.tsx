@@ -114,6 +114,7 @@ import {
   useHosts,
 } from "@/runtime/host-runtime";
 import { getDaemonStartService } from "@/runtime/daemon-start-service";
+import { LocalDaemonConnectionPrompt } from "@/desktop/components/local-daemon-connection-prompt";
 import { usePanelStore } from "@/stores/panel-store";
 import { flushDraftPersistStorage } from "@/stores/draft-store";
 import { getNextThemePreference, ICON_STROKE_WIDTH } from "@/styles/theme";
@@ -482,6 +483,11 @@ interface AppContainerProps {
 
 const WINDOW_SIDEBAR_TOGGLE_HORIZONTAL_PADDING = 12;
 
+// Kept outside AppContainer so the desktop-only prompt does not add to its branch count.
+function DesktopLocalDaemonPrompt() {
+  return shouldUseDesktopDaemon() ? <LocalDaemonConnectionPrompt /> : null;
+}
+
 function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppContainerProps) {
   const keyboardActionDispatcher = useKeyboardActionDispatcher();
   const daemons = useHosts();
@@ -637,6 +643,7 @@ function AppContainer({ children, chromeEnabled: chromeEnabledOverride }: AppCon
         <AddProjectFlowHost />
         <HostChooserModal />
         <HostConfirmationSheet />
+        <DesktopLocalDaemonPrompt />
         <ProviderSettingsHost />
         <WorkspaceSetupDialog />
         <KeyboardShortcutsDialog />
