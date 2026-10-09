@@ -5,6 +5,7 @@ import {
   WorkspaceGitHubRuntimePayloadSchema,
 } from "@getpaseo/protocol/messages";
 import { AgentProviderSchema } from "@getpaseo/protocol/provider-manifest";
+import { WorkspacePortSchema } from "@getpaseo/protocol/workspace-ports";
 import type { PluginTimelineData } from "@getpaseo/plugin";
 import {
   normalizeProjectDescriptor,
@@ -319,6 +320,7 @@ const StoredWorkspaceSchema = z.strictObject({
   archivingAt: z.string().nullable(),
   diffStat: z.strictObject({ additions: z.number(), deletions: z.number() }).nullable(),
   scripts: z.array(WorkspaceScriptSchema),
+  portForwards: z.array(WorkspacePortSchema).optional(),
   gitRuntime: WorkspaceGitRuntimeSchema,
   githubRuntime: WorkspaceGitHubRuntimePayloadSchema,
   forge: z.string().optional(),
@@ -720,6 +722,7 @@ function serializeWorkspace(workspace: WorkspaceDescriptor): StoredWorkspace {
       exitCode: script.exitCode,
       terminalId: script.terminalId,
     })),
+    portForwards: workspace.portForwards,
     gitRuntime: workspace.gitRuntime,
     githubRuntime: workspace.githubRuntime,
     forge: workspace.forge,

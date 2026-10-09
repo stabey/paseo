@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, type ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import type { GestureResponderEvent } from "react-native";
 import { Pressable, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
@@ -38,6 +38,9 @@ import type { Theme } from "@/styles/theme";
 import { useWorkspaceServiceRoutePreferencesStore } from "@/workspace-service-routes/store";
 import { buttonControlHeight, HEADER_CONTROL_HEIGHT } from "@/components/ui/control-geometry";
 import { extraMutedIconColorMapping } from "@/components/ui/icon-color";
+import { isElectronRuntime } from "@/desktop/host";
+import { getPortForwarding } from "@/port-forwarding/desktop";
+import { WorkspacePortsSheet } from "@/port-forwarding/workspace-ports-sheet";
 
 type RowActionIcon = "copy" | "open" | "restart" | "start" | "stop" | "terminal";
 
@@ -171,7 +174,8 @@ function routeLabelKey(
 ):
   | "workspace.scripts.routes.public"
   | "workspace.scripts.routes.paseo"
-  | "workspace.scripts.routes.direct" {
+  | "workspace.scripts.routes.direct"
+  | "workspace.ports.thisDevice" {
   switch (kind) {
     case "public":
       return "workspace.scripts.routes.public";
@@ -179,6 +183,8 @@ function routeLabelKey(
       return "workspace.scripts.routes.paseo";
     case "direct":
       return "workspace.scripts.routes.direct";
+    case "forwarded":
+      return "workspace.ports.thisDevice";
   }
 }
 
@@ -362,6 +368,7 @@ interface ScriptRowProps {
   onSelectRouteKind: (kind: WorkspaceScriptLinkKind) => void;
   onViewTerminal?: (terminalId: string) => void;
   onOpenUrlInBrowserTab?: (url: string) => void;
+  onForwardService?: (port: number, action: "open" | "copy") => void;
 }
 
 function resolveScriptIconColorMapping(args: {
@@ -394,12 +401,17 @@ function ScriptRow({
   onSelectRouteKind,
   onViewTerminal,
   onOpenUrlInBrowserTab,
+  onForwardService,
 }: ScriptRowProps): ReactElement {
   const { t } = useTranslation();
   const isRunning = script.lifecycle === "running";
   const isService = (script.type ?? "service") === "service";
   const exitCode = script.exitCode ?? null;
-  const serviceLink = resolveWorkspaceScriptLink({ script, activeConnection });
+  const serviceLink = resolveWorkspaceScriptLink({
+    script,
+    activeConnection,
+    forwardedLabel: onForwardService ? t("workspace.ports.thisDevice") : undefined,
+  });
   const selectedLink =
     isService && isRunning
       ? (serviceLink.targets.find((target) => target.kind === preferredRouteKind) ??
@@ -416,8 +428,21 @@ function ScriptRow({
   const handleOpenService = useCallback(() => {
     if (!selectedLink) return;
     closeMenu();
+    if (selectedLink.kind === "forwarded" && script.port) {
+      onForwardService?.(script.port, "open");
+      return;
+    }
     void openServiceUrl(selectedLink.url, { openInApp: onOpenUrlInBrowserTab });
-  }, [selectedLink, closeMenu, onOpenUrlInBrowserTab]);
+  }, [selectedLink, closeMenu, onOpenUrlInBrowserTab, onForwardService, script.port]);
+
+  const handleCopyService = useCallback(
+    (url: string, label: string) => {
+      if (selectedLink?.kind === "forwarded" && script.port)
+        onForwardService?.(script.port, "copy");
+      else onCopyUrl(url, label);
+    },
+    [selectedLink, script.port, onForwardService, onCopyUrl],
+  );
 
   const handleView = useCallback(() => {
     if (liveTerminalId) onViewTerminal?.(liveTerminalId);
@@ -526,7 +551,7 @@ function ScriptRow({
             targets={serviceLink.targets}
             scriptName={script.scriptName}
             onSelectKind={onSelectRouteKind}
-            onCopy={onCopyUrl}
+            onCopy={handleCopyService}
           />
         </View>
       ) : null}
@@ -549,6 +574,29 @@ export function WorkspaceScriptsButton({
   const toast = useToast();
   const client = useSessionStore((state) => state.sessions[serverId]?.client ?? null);
   const activeConnection = useHostRuntimeSnapshot(serverId)?.activeConnection ?? null;
+  const supportsForwarding = useSessionStore(
+    (state) => state.sessions[serverId]?.serverInfo?.features?.workspacePortForwarding === true,
+  );
+  const [portsVisible, setPortsVisible] = useState(false);
+  const showPorts = useCallback(() => setPortsVisible(true), []);
+  const hidePorts = useCallback(() => setPortsVisible(false), []);
+  const isDesktop = isElectronRuntime();
+  const forwardService = useMutation({
+    mutationFn: async ({ port, action }: { port: number; action: "open" | "copy" }) => {
+      if (!client) throw new Error(t("common.errors.daemonClientUnavailable"));
+      const forward = await getPortForwarding(client).start({ workspaceId, port });
+      const url = `http://127.0.0.1:${forward.localPort}`;
+      if (action === "copy") {
+        await Clipboard.setStringAsync(url);
+        toast.copied(url);
+      } else await openServiceUrl(url, { openInApp: onOpenUrlInBrowserTab });
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const handleForwardService = useCallback(
+    (port: number, action: "open" | "copy") => forwardService.mutate({ port, action }),
+    [forwardService],
+  );
   const preferredRouteKind = useWorkspaceServiceRoutePreferencesStore(
     (state) => state.byServerId[serverId] ?? null,
   );
@@ -666,7 +714,7 @@ export function WorkspaceScriptsButton({
     [serverId, setPreferredRoute],
   );
 
-  if (scripts.length === 0) {
+  if (scripts.length === 0 && !isDesktop) {
     return null;
   }
 
@@ -722,11 +770,27 @@ export function WorkspaceScriptsButton({
                 onSelectRouteKind={handleSelectRouteKind}
                 onViewTerminal={onViewTerminal}
                 onOpenUrlInBrowserTab={onOpenUrlInBrowserTab}
+                onForwardService={
+                  isDesktop && supportsForwarding ? handleForwardService : undefined
+                }
               />
             ))}
+            {isDesktop ? (
+              <DropdownMenuItem testID="workspace-ports-menu-item" onSelect={showPorts}>
+                {t("workspace.ports.title")}
+              </DropdownMenuItem>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </View>
+      {portsVisible ? (
+        <WorkspacePortsSheet
+          serverId={serverId}
+          workspaceId={workspaceId}
+          onClose={hidePorts}
+          onOpenUrlInBrowserTab={onOpenUrlInBrowserTab}
+        />
+      ) : null}
     </View>
   );
 }

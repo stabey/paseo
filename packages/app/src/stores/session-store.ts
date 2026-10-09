@@ -123,6 +123,7 @@ export interface WorkspaceDescriptor {
   archivingAt: string | null;
   diffStat: { additions: number; deletions: number } | null;
   scripts: WorkspaceDescriptorPayload["scripts"];
+  portForwards?: WorkspaceDescriptorPayload["portForwards"];
   gitRuntime?: WorkspaceDescriptorPayload["gitRuntime"];
   githubRuntime?: WorkspaceDescriptorPayload["githubRuntime"];
   forge?: WorkspaceDescriptorPayload["forge"];
@@ -162,6 +163,8 @@ export function normalizeWorkspaceDescriptor(
     archivingAt: payload.archivingAt ?? null,
     diffStat: payload.diffStat ?? null,
     scripts: (payload.scripts ?? []).map((s) => Object.assign({}, s)),
+    // COMPAT(workspacePortForwarding): daemons through v0.11.1 omit ports; remove after 2027-04-09 once the daemon floor supports forwarding.
+    portForwards: payload.portForwards ?? [],
     gitRuntime: payload.gitRuntime,
     githubRuntime: payload.githubRuntime,
     forge: payload.forge,
