@@ -95,6 +95,10 @@ checks; install artifacts only from a successful workflow run. Actions retains t
 packages for 30 days. Each archive includes the source commit in `build-info.json`
 and package hashes in `SHA256SUMS`.
 
+On Windows ARM64, the locked Cloudflare `workerd` installer rejects the platform.
+CI skips that deployment tool's installer and replays the other dependency scripts,
+including native modules and repository patches. Desktop builds do not use `workerd`.
+
 All packages receive the same `-stabey.<run number>` version in the build
 checkout, including their internal dependency ranges. The version sync's
 `--lockfile` option updates local package metadata while preserving the locked
