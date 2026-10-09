@@ -2,3 +2,5 @@ extends: ./electron-builder.yml
 mac:
   identity: "-"
   notarize: false
+  entitlements: build/entitlements.mac.personal.plist
+  entitlementsInherit: build/entitlements.mac.personal.plist

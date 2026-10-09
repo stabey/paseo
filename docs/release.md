@@ -100,7 +100,11 @@ daemon restarts. Web exports set `PASEO_WEB_RELEASE_VERSION` to the upstream bas
 version because Expo also evaluates native build numbers, whose format excludes
 private prerelease suffixes. Keep this override out of native mobile builds.
 The desktop build uses an ad-hoc signature without Apple
-notarization. macOS may require approval in Privacy & Security on first launch.
+notarization. Its personal entitlements disable library validation for the app and
+helpers because ad-hoc signatures have no Team ID; otherwise macOS rejects the
+Electron framework at launch. Keep Hardened Runtime enabled and keep this exception
+out of the official signing configuration. CI checks the signed entitlements in
+addition to the packaged smoke test. macOS may require approval in Privacy & Security on first launch.
 Its updater points to `stabey/paseo`; these CI runs upload Actions artifacts
 without publishing GitHub Releases or update manifests,
 so install subsequent CI builds manually.

@@ -55,6 +55,22 @@ jobs:
           npm run build:desktop -- --publish never --mac --arm64 \
             --config electron-builder.personal.yml
 
+      - name: Verify personal signing entitlements
+        run: |
+          python3 - <<'PY'
+          import pathlib, plistlib, subprocess
+          app = pathlib.Path("packages/desktop/release/mac-arm64/Paseo.app")
+          subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
+          bundles = [app, *sorted((app / "Contents/Frameworks").glob("*.app"))]
+          for bundle in bundles:
+              result = subprocess.run(["codesign", "-d", "--entitlements", ":-", str(bundle)], check=True, capture_output=True)
+              entitlements = plistlib.loads(result.stdout)
+              assert entitlements.get("com.apple.security.cs.disable-library-validation") is True, bundle
+              signature = subprocess.run(["codesign", "-dv", str(bundle)], check=True, capture_output=True, text=True)
+              assert "runtime" in signature.stderr, bundle
+              print(f"Personal signing verified: {bundle.name}")
+          PY
+
       - name: Record desktop build provenance
         run: |
           node -e 'require("node:fs").writeFileSync("packages/desktop/release/build-info.json", JSON.stringify({repository:process.env.GITHUB_REPOSITORY, branch:process.env.GITHUB_REF_NAME, commit:process.env.GITHUB_SHA, run:process.env.GITHUB_RUN_ID, version:require("./package.json").version}, null, 2)+"\n")'
