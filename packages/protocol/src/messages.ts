@@ -21,6 +21,7 @@ export { TerminalProfileSchema, type TerminalProfile } from "./terminal-profile.
 import { ProjectSearchConfigSchema } from "./project-search-config.js";
 export { ProjectSearchConfigSchema } from "./project-search-config.js";
 import { z } from "zod";
+import { WorkspacePortSchema } from "./workspace-ports.js";
 import { TerminalActivitySchema } from "./terminal-activity.js";
 import { CLIENT_CAPS } from "./client-capabilities.js";
 import { AGENT_LIFECYCLE_STATUSES } from "./agent-lifecycle.js";
@@ -2998,6 +2999,14 @@ export const WorkspaceScriptListRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const WorkspacePortSetRequestSchema = z.object({
+  type: z.literal("workspace.port.set.request"),
+  workspaceId: z.string().min(1),
+  port: z.number().int().min(1).max(65535),
+  configuration: WorkspacePortSchema.omit({ port: true }).nullable(),
+  requestId: z.string(),
+});
+
 export const WorkspaceScriptStartRequestSchema = z.object({
   type: z.literal("workspace.script.start.request"),
   workspaceId: z.string(),
@@ -3378,6 +3387,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   RenameTerminalRequestSchema,
   StartWorkspaceScriptRequestSchema,
   WorkspaceScriptListRequestSchema,
+  WorkspacePortSetRequestSchema,
   WorkspaceScriptStartRequestSchema,
   WorkspaceScriptStopRequestSchema,
   SubscribeTerminalRequestSchema,
@@ -3622,6 +3632,7 @@ export const ServerInfoStatusPayloadSchema = z
         forgeSearch: z.boolean().optional(),
         // COMPAT(daemonStatusRpc): added in v0.1.76, remove gate after 2026-11-18.
         daemonStatusRpc: z.boolean().optional(),
+        workspacePortForwarding: z.boolean().optional(),
         // COMPAT(daemonConfigReload): added in v0.4.0, remove gate after 2027-02-14.
         daemonConfigReload: z.boolean().optional(),
         projectSearchRoots: z.boolean().optional(),
@@ -4077,6 +4088,7 @@ export const WorkspaceDescriptorPayloadSchema = z
       .nullable()
       .optional(),
     scripts: z.array(WorkspaceScriptPayloadSchema).default([]),
+    portForwards: z.array(WorkspacePortSchema).optional(),
     gitRuntime: WorkspaceGitRuntimePayloadSchema,
     // COMPAT(githubRuntimeName): legacy wire-field name now carries
     // forge-neutral runtime data. Introduce and migrate to a neutral
@@ -4556,6 +4568,16 @@ const WorkspaceScriptOperationPayloadSchema = z.object({
 export const WorkspaceScriptListResponseMessageSchema = z.object({
   type: z.literal("workspace.script.list.response"),
   payload: WorkspaceScriptOperationPayloadSchema,
+});
+
+export const WorkspacePortSetResponseMessageSchema = z.object({
+  type: z.literal("workspace.port.set.response"),
+  payload: z.object({
+    requestId: z.string(),
+    workspaceId: z.string(),
+    ports: z.array(WorkspacePortSchema),
+    error: z.string().nullable(),
+  }),
 });
 
 export const WorkspaceScriptStartResponseMessageSchema = z.object({
@@ -6920,6 +6942,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ProjectGithubCloneResponseSchema,
   StartWorkspaceScriptResponseMessageSchema,
   WorkspaceScriptListResponseMessageSchema,
+  WorkspacePortSetResponseMessageSchema,
   WorkspaceScriptStartResponseMessageSchema,
   WorkspaceScriptStopResponseMessageSchema,
   LegacyListAvailableEditorsResponseMessageSchema,

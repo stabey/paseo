@@ -318,6 +318,18 @@ from one stable file handle. Each transfer awaits completion of its own physical
 reading the next chunk; it is scoped to the requesting physical socket and does not queue unrelated
 messages or transfers.
 
+Downloads over relay or local IPC use this authenticated file stream because those connections
+have no browser-reachable daemon HTTP address. The app currently collects the file before handing
+it to the browser or native share sheet, so these downloads are bounded to 64 MiB. Direct TCP
+downloads retain the streaming HTTP token endpoint.
+
+Workspace TCP forwarding is another binary frame family on the same connection. Its stream
+ownership follows the physical source socket, not the shared client ID. Use the session delivery
+boundary's source-bound binary sender so outbound frames carry the same ownership proof as file
+transfers. Credit is returned after target socket writes complete; this bounds queued data when
+either local service or client reads slowly. For access, lifecycle, and trust boundaries, see
+[Service Proxy](service-proxy.md#desktop-port-forwarding).
+
 ### Compatibility rules
 
 - WebSocket schemas are append-only. Add fields, do not remove fields, and never make optional fields required.

@@ -1,3 +1,4 @@
+import { workspacePorts } from "./workspace-ports";
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
@@ -438,6 +439,7 @@ export const ja: TranslationResources = {
     },
   },
   workspace: {
+    ports: workspacePorts.en,
     route: {
       loading: "ワークスペースを読み込み中",
       connecting: "接続中",
@@ -1900,6 +1902,7 @@ export const ja: TranslationResources = {
     dontAskAgain: "次回から確認しない",
   },
   downloads: {
+    connectedSizeLimit: "Downloads over this connection are limited to 64 MiB.",
     requestTokenFailed: "ダウンロードトークンのリクエストに失敗しました。",
     hostUnavailable: "ダウンロードホストが利用できません。",
     cancelled: "ダウンロードがキャンセルされました。",

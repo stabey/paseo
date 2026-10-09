@@ -46,6 +46,12 @@ import type {
 import { TerminalSessionController } from "../terminal/terminal-session-controller.js";
 import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
 import type { BinaryFrame } from "@getpaseo/protocol/binary-frames/index";
+import {
+  encodeTunnelFrame,
+  TunnelCloseReason,
+  TunnelOpcode,
+} from "@getpaseo/protocol/binary-frames/index";
+import { WorkspaceTunnel } from "./port-forwarding/forwarder.js";
 import { CursorError } from "./pagination/cursor.js";
 import { SortablePager, type SortSpec } from "./pagination/sortable-pager.js";
 import { matchesAgentHistoryQuery } from "./agent-history-search.js";
@@ -798,6 +804,10 @@ export class Session {
   private readonly daemonSession: DaemonSession;
   private readonly hubExecutionController: HubExecutionController | null;
   private readonly workspaceScripts: WorkspaceScriptsService;
+  private readonly portTunnels = new Map<
+    object,
+    { tunnel: WorkspaceTunnel; unsubscribe: () => void }
+  >();
   private readonly messageReceipts: Pick<MessageReceipts, "send">;
   private readonly createAgentLifecycleDispatch: CreateAgentLifecycleDispatch;
   private readonly creationService: Pick<CreationService, "create" | "subscribe">;
@@ -1277,6 +1287,10 @@ export class Session {
   }
 
   clearAgentTimelineSubscription(source: object): void {
+    const forwarder = this.portTunnels.get(source);
+    forwarder?.unsubscribe();
+    forwarder?.tunnel.dispose();
+    this.portTunnels.delete(source);
     void this.delivery
       .detach(source)
       .catch((err) => this.sessionLogger.error({ err }, "Failed to release source subscriptions"));
@@ -2206,6 +2220,13 @@ export class Session {
 
   public setPermissions(permissions: readonly DaemonPermission[]): void {
     this.authorization.replacePermissions(permissions);
+    if (!this.authorization.allowsPermission("tunnel.manage")) {
+      for (const forwarder of this.portTunnels.values()) {
+        forwarder.unsubscribe();
+        forwarder.tunnel.revoke();
+      }
+      this.portTunnels.clear();
+    }
     if (!this.authorization.allowsPermission("workspace.write")) {
       void this.delivery
         .releaseFamily("browser-host")
@@ -3055,6 +3076,8 @@ export class Session {
 
   private dispatchTerminalMessage(msg: SessionInboundMessage): Promise<void> | undefined {
     switch (msg.type) {
+      case "workspace.port.set.request":
+        return this.setWorkspacePort(msg);
       case "start_workspace_script_request":
         return this.handleStartWorkspaceScriptRequest(msg);
       case "workspace.script.list.request":
@@ -3123,6 +3146,38 @@ export class Session {
   }
 
   public async handleBinaryFrame(binaryFrame: BinaryFrame, source: object): Promise<void> {
+    if (binaryFrame.kind === "tunnel") {
+      if (!this.onBinaryMessageToSource) return;
+      if (!this.authorization.allowsPermission("tunnel.manage")) {
+        await this.delivery.binarySender(
+          source,
+          this.onBinaryMessageToSource,
+        )(
+          encodeTunnelFrame({
+            opcode: TunnelOpcode.Close,
+            streamId: binaryFrame.frame.streamId,
+            reason: TunnelCloseReason.Forbidden,
+          }),
+        );
+        return;
+      }
+      let forwarder = this.portTunnels.get(source);
+      if (!forwarder) {
+        const send = this.delivery.binarySender(source, this.onBinaryMessageToSource);
+        const tunnel = new WorkspaceTunnel({
+          authorizeTarget: (workspaceId, port) => this.canForwardWorkspacePort(workspaceId, port),
+          send: (frame) => send(encodeTunnelFrame(frame)),
+        });
+        const unsubscribe =
+          this.workspaceRegistry.subscribeToMutations?.((mutation) => {
+            void tunnel.revalidate(mutation.workspaceId);
+          }) ?? (() => {});
+        forwarder = { tunnel, unsubscribe };
+        this.portTunnels.set(source, forwarder);
+      }
+      forwarder.tunnel.receive(binaryFrame.frame);
+      return;
+    }
     if (!this.authorization.allowsPermission("workspace.write")) {
       return;
     }
@@ -3131,6 +3186,51 @@ export class Session {
       return;
     }
     this.terminalController.handleBinaryFrame(binaryFrame.frame, source);
+  }
+
+  private async canForwardWorkspacePort(workspaceId: string, port: number): Promise<boolean> {
+    const workspace = await this.workspaceRegistry.get(workspaceId);
+    if (!workspace || workspace.archivedAt) return false;
+    if (workspace.portForwards?.some((entry) => entry.port === port)) return true;
+    const scripts = await this.workspaceScripts.list(workspaceId);
+    return scripts.some(
+      (script) =>
+        script.type === "service" && script.lifecycle === "running" && script.port === port,
+    );
+  }
+
+  private async setWorkspacePort(
+    request: Extract<SessionInboundMessage, { type: "workspace.port.set.request" }>,
+  ): Promise<void> {
+    try {
+      const updated = await this.workspaceRegistry.update(request.workspaceId, (workspace) => {
+        if (workspace.archivedAt) throw new Error("Workspace is archived");
+        const ports = (workspace.portForwards ?? []).filter((entry) => entry.port !== request.port);
+        if (request.configuration) ports.push({ port: request.port, ...request.configuration });
+        if (ports.length > 64) throw new Error("A workspace can forward at most 64 ports");
+        return { ...workspace, portForwards: ports, updatedAt: new Date().toISOString() };
+      });
+      if (!updated) throw new Error("Workspace not found");
+      this.emit({
+        type: "workspace.port.set.response",
+        payload: {
+          requestId: request.requestId,
+          workspaceId: request.workspaceId,
+          ports: updated.portForwards ?? [],
+          error: null,
+        },
+      });
+    } catch (error) {
+      this.emit({
+        type: "workspace.port.set.response",
+        payload: {
+          requestId: request.requestId,
+          workspaceId: request.workspaceId,
+          ports: [],
+          error: error instanceof Error ? error.message : "Could not save port forwarding",
+        },
+      });
+    }
   }
 
   private async handleRestartServerRequest(requestId: string, reason?: string): Promise<void> {
@@ -5624,6 +5724,7 @@ export class Session {
       activityAt: null,
       diffStat,
       scripts: this.buildWorkspaceScriptPayloadSnapshot(workspace, resolvedProjectRecord),
+      portForwards: workspace.portForwards ?? [],
       ...(resolvedProjectRecord
         ? {
             project: await this.buildProjectPlacementForWorkspace(workspace, resolvedProjectRecord),
@@ -8558,6 +8659,11 @@ export class Session {
    * Clean up session resources
    */
   public async cleanup(): Promise<void> {
+    for (const { tunnel, unsubscribe } of this.portTunnels.values()) {
+      unsubscribe();
+      tunnel.dispose();
+    }
+    this.portTunnels.clear();
     this.sessionLogger.trace({}, "agent.session.lifecycle.cleanup");
     this.isCleanedUp = true;
     await this.delivery.close();

@@ -1,3 +1,4 @@
+import { workspacePorts } from "./workspace-ports";
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
@@ -438,6 +439,7 @@ export const es: TranslationResources = {
     },
   },
   workspace: {
+    ports: workspacePorts.en,
     route: {
       loading: "Cargando espacio de trabajo",
       connecting: "Conectando",
@@ -1931,6 +1933,7 @@ export const es: TranslationResources = {
     dontAskAgain: "no vuelvas a preguntar",
   },
   downloads: {
+    connectedSizeLimit: "Downloads over this connection are limited to 64 MiB.",
     requestTokenFailed: "No se pudo solicitar el token de descarga.",
     hostUnavailable: "El host de descarga no está disponible.",
     cancelled: "La descarga fue cancelada.",

@@ -1,3 +1,4 @@
+import { workspacePorts } from "./workspace-ports";
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
@@ -434,6 +435,7 @@ export const ko: TranslationResources = {
     },
   },
   workspace: {
+    ports: workspacePorts.en,
     route: {
       loading: "워크스페이스 불러오는 중",
       connecting: "연결 중",
@@ -1891,6 +1893,7 @@ export const ko: TranslationResources = {
     dontAskAgain: "다시 묻지 않기",
   },
   downloads: {
+    connectedSizeLimit: "Downloads over this connection are limited to 64 MiB.",
     requestTokenFailed: "다운로드 토큰을 요청하지 못했습니다.",
     hostUnavailable: "다운로드 호스트를 사용할 수 없습니다.",
     cancelled: "다운로드가 취소되었습니다.",

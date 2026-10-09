@@ -3,6 +3,26 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import { SessionDelivery } from "./index.js";
 
+test("binary senders prove one physical source and are revoked on detach", async () => {
+  const delivery = new SessionDelivery(() => {});
+  const source = {};
+  const sibling = {};
+  delivery.attach(source, true);
+  delivery.attach(sibling, true);
+  const frame = new Uint8Array([0x23, 1, 65]);
+  expect(delivery.permitsBinary(source, frame)).toBe(false);
+  const send = delivery.binarySender(source, async (socket, bytes) => {
+    expect(socket).toBe(source);
+    expect(delivery.permitsBinary(source, bytes)).toBe(true);
+    expect(delivery.permitsBinary(sibling, bytes)).toBe(false);
+  });
+  await send(frame);
+  await delivery.detach(source);
+  expect(delivery.permitsBinary(source, frame)).toBe(false);
+  await expect(send(frame)).rejects.toThrow("closed");
+  await delivery.close();
+});
+
 function retainedPromiseBytes(cycles: number): number {
   const fixture = fileURLToPath(new URL("./test-utils/memory-repro.ts", import.meta.url));
   const output = execFileSync(

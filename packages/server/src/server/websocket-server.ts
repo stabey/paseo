@@ -1787,6 +1787,7 @@ export class VoiceAssistantWebSocketServer {
       desktopManaged: this.daemonRuntimeConfig?.desktopManaged === true,
       ...(this.serverCapabilities ? { capabilities: this.serverCapabilities } : {}),
       features: {
+        workspacePortForwarding: session.getPermissions().includes("tunnel.manage"),
         usageSources: true,
         ownedSubscriptions: true,
         agentRequestReceipts: true,

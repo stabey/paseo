@@ -21,25 +21,8 @@ const {
   routePreferenceByServerIdMock,
   routePreferenceListenersMock,
   setPreferredRouteMock,
-} = vi.hoisted(() => {
-  const hoistedTheme = {
-    spacing: { 1: 4, 1.5: 6, 2: 8, 3: 12 },
-    borderWidth: { 1: 1 },
-    borderRadius: { md: 6, lg: 8 },
-    fontSize: { xs: 11, sm: 13 },
-    fontWeight: { normal: "400", medium: "500" },
-    colors: {
-      foreground: "#fff",
-      foregroundMuted: "#aaa",
-      surface2: "#222",
-      borderAccent: "#444",
-      palette: {
-        blue: { 500: "#0a84ff" },
-        green: { 500: "#30d158" },
-        red: { 300: "#ff9f99", 500: "#ff453a" },
-      },
-    },
-  };
+} = await vi.hoisted(async () => {
+  const { theme: hoistedTheme } = await import("@/styles/theme");
 
   const routePreferenceByServerId: Record<string, "public" | "paseo" | "direct"> = {};
   const routePreferenceListeners = new Set<() => void>();

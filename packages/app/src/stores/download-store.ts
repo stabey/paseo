@@ -7,6 +7,7 @@ import { buildDaemonWebSocketUrl } from "@/utils/daemon-endpoints";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { isWeb } from "@/constants/platform";
 import { i18n } from "@/i18n/i18next";
+import type { FileReadResult } from "@getpaseo/client/internal/daemon-client";
 
 interface DownloadProgress {
   percent: number;
@@ -37,6 +38,7 @@ interface DownloadState {
     fileName: string;
     path: string;
     daemonProfile: HostProfile | undefined;
+    readConnectedFile?: (path: string) => Promise<FileReadResult>;
     requestFileDownloadToken: (path: string) => Promise<{
       token: string | null;
       fileName: string | null;
@@ -66,6 +68,7 @@ export const useDownloadStore = create<DownloadState>()((set, get) => ({
     fileName,
     path,
     daemonProfile,
+    readConnectedFile,
     requestFileDownloadToken,
   }) => {
     const id = generateDownloadId();
@@ -84,6 +87,28 @@ export const useDownloadStore = create<DownloadState>()((set, get) => ({
     }));
 
     try {
+      if (readConnectedFile) {
+        // Relay and local IPC connections have no browser-reachable HTTP address.
+        const file = await readConnectedFile(path);
+        if (isWeb) {
+          const url = URL.createObjectURL(
+            new Blob([new Uint8Array(file.bytes)], { type: file.mime }),
+          );
+          triggerBrowserDownload(url, fileName);
+          setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        } else {
+          const targetFile = resolveDownloadTargetFile(fileName);
+          targetFile.write(file.bytes);
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(targetFile.uri, {
+              mimeType: file.mime,
+              dialogTitle: fileName,
+            });
+          }
+        }
+        get().completeDownload(id);
+        return;
+      }
       const tokenResponse = await requestFileDownloadToken(path);
       if (tokenResponse.error || !tokenResponse.token) {
         throw new Error(tokenResponse.error ?? i18n.t("downloads.requestTokenFailed"));

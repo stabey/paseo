@@ -13,6 +13,11 @@
   "type": "module",
   "types": "./dist/server/server/exports.d.ts",
   "exports": {
+    "./tcp-tunnel": {
+      "types": "./dist/server/tunnel/tcp-stream.d.ts",
+      "source": "./src/tunnel/tcp-stream.ts",
+      "default": "./dist/server/tunnel/tcp-stream.js"
+    },
     ".": {
       "types": "./dist/server/server/exports.d.ts",
       "source": "./src/server/exports.ts",

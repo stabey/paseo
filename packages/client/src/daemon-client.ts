@@ -2,6 +2,14 @@ import { legacyUsageIcon } from "./legacy-usage-icons.js";
 import { subscribeTimeline, type TimelineMessage } from "./timeline-subscription/index.js";
 import { ProviderSnapshotUpdates } from "./provider-snapshots/index.js";
 import {
+  decodeTunnelFrame,
+  encodeTunnelFrame,
+  TunnelOpcode,
+  TunnelCloseReason,
+  type TunnelFrame,
+} from "@getpaseo/protocol/binary-frames/index";
+import type { WorkspacePort } from "@getpaseo/protocol/workspace-ports";
+import {
   ConnectionSubscriptions,
   type OwnedSubscription,
   DEFAULT_CLIENT_CAPABILITIES,
@@ -1273,6 +1281,7 @@ export class DaemonClient {
   private pendingBinaryFileReads = new Map<string, PendingBinaryFileRead>();
   private activeBinaryFileTransfers = new Map<string, BinaryFileTransferState>();
   private completedBinaryFileReads = new Map<string, FileReadResult>();
+  private readonly tunnelListeners = new Set<(frame: TunnelFrame) => void>();
   private logger: Logger;
   private pendingSendQueue: PendingSend[] = [];
   private readonly logConnectionPath: "direct" | "relay";
@@ -2719,6 +2728,81 @@ export class DaemonClient {
       requestId,
       message: { type: "workspace.script.list.request", workspaceId },
       responseType: "workspace.script.list.response",
+    });
+  }
+
+  async setWorkspacePort(input: {
+    workspaceId: string;
+    port: number;
+    configuration: Omit<WorkspacePort, "port"> | null;
+  }): Promise<WorkspacePort[]> {
+    const response = await this.sendCorrelatedSessionRequest({
+      message: { type: "workspace.port.set.request", ...input },
+      responseType: "workspace.port.set.response",
+    });
+    if (response.error) throw new Error(response.error);
+    return response.ports;
+  }
+
+  onTunnelFrame(listener: (frame: TunnelFrame) => void): () => void {
+    this.tunnelListeners.add(listener);
+    return () => this.tunnelListeners.delete(listener);
+  }
+
+  sendTunnelFrame(frame: TunnelFrame): void {
+    if (!this.isConnected) throw new DaemonConnectionError("Port forwarding connection lost");
+    this.sendTransportFrame(encodeTunnelFrame(frame));
+  }
+
+  async probeWorkspacePort(input: { workspaceId: string; port: number }): Promise<void> {
+    if (!this.isConnected) throw new DaemonConnectionError("Port forwarding connection lost");
+    const streamId = this.createRequestId();
+    await new Promise<void>((resolve, reject) => {
+      let done = false;
+      let unlistenStatus = () => {};
+      const finish = (error?: Error) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        unlistenFrame();
+        unlistenStatus();
+        try {
+          if (this.isConnected)
+            this.sendTunnelFrame({
+              opcode: TunnelOpcode.Close,
+              streamId,
+              reason: TunnelCloseReason.Closed,
+            });
+        } catch {
+          // A connection that disappears during cleanup is already closed by the daemon.
+        }
+        if (error) reject(error);
+        else resolve();
+      };
+      const unlistenFrame = this.onTunnelFrame((frame) => {
+        if (frame.streamId !== streamId) return;
+        if (frame.opcode === TunnelOpcode.Opened) finish();
+        if (frame.opcode === TunnelOpcode.Close) {
+          const message =
+            frame.reason === TunnelCloseReason.Forbidden
+              ? "Port is not registered for this workspace or forwarding is not permitted"
+              : "The daemon could not connect to this service port";
+          finish(new Error(message));
+        }
+      });
+      const timer = setTimeout(
+        () => finish(new Error("Port forwarding connection timed out")),
+        15_000,
+      );
+      unlistenStatus = this.subscribeConnectionStatus((state) => {
+        if (state.status !== "connected")
+          finish(new DaemonConnectionError("Port forwarding connection lost"));
+      });
+      try {
+        this.sendTunnelFrame({ opcode: TunnelOpcode.Open, streamId, ...input });
+      } catch (error) {
+        finish(error instanceof Error ? error : new Error(String(error)));
+      }
     });
   }
 
@@ -6431,6 +6515,12 @@ export class DaemonClient {
   }
 
   private tryHandleBinaryFrame(rawBytes: Uint8Array): boolean {
+    const tunnelFrame = decodeTunnelFrame(rawBytes);
+    if (tunnelFrame) {
+      this.consecutiveLivenessFailures = 0;
+      for (const listener of this.tunnelListeners) listener(tunnelFrame);
+      return true;
+    }
     const fileFrame = decodeFileTransferFrame(rawBytes);
     if (fileFrame) {
       this.traceInstant("paseo.ws.message.inbound", {

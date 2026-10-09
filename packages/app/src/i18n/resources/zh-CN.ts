@@ -1,3 +1,4 @@
+import { workspacePorts } from "./workspace-ports";
 import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
@@ -433,6 +434,7 @@ export const zhCN: TranslationResources = {
     },
   },
   workspace: {
+    ports: workspacePorts.zhCN,
     route: {
       loading: "正在加载 workspace",
       connecting: "正在连接",
@@ -1859,6 +1861,7 @@ export const zhCN: TranslationResources = {
     dontAskAgain: "不再询问",
   },
   downloads: {
+    connectedSizeLimit: "通过当前连接下载的文件不能超过 64 MiB。",
     requestTokenFailed: "请求下载 token 失败。",
     hostUnavailable: "下载 Host 不可用。",
     cancelled: "下载已取消。",

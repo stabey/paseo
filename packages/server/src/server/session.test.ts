@@ -21,6 +21,9 @@ import {
   encodeFileTransferFrame,
   FileTransferOpcode,
   type FileTransferFrame,
+  TunnelOpcode,
+  TunnelCloseReason,
+  decodeTunnelFrame,
 } from "@getpaseo/protocol/binary-frames/index";
 import { Session } from "./session.js";
 import { OWNER_PERMISSIONS, type DaemonPermission } from "./authorization/index.js";
@@ -106,6 +109,52 @@ function createBinaryMessageHandler(
     binaryMessages.push(frame);
   };
 }
+
+test("port forwarding requires tunnel.manage for both configuration and binary open", async () => {
+  const messages: SessionOutboundMessage[] = [];
+  const binary: Uint8Array[] = [];
+  const session = createSessionForTest({
+    permissions: ["workspace.read", "workspace.write"],
+    messages,
+    onBinaryMessageToSource: async (_source, frame) => {
+      binary.push(frame);
+    },
+  });
+  const source = {};
+  session.updateClientCapabilities({ [CLIENT_CAPS.ownedSubscriptions]: true }, source);
+  await session.handleMessage(
+    {
+      type: "workspace.port.set.request",
+      requestId: "configure-port",
+      workspaceId: "ws",
+      port: 3000,
+      configuration: { label: "Preview", protocol: "http" },
+    },
+    source,
+  );
+  expect(messages).toEqual([
+    {
+      type: "rpc_error",
+      payload: {
+        requestId: "configure-port",
+        requestType: "workspace.port.set.request",
+        error: "Session is not authorized for workspace.port.set.request",
+        code: "access_denied",
+      },
+    },
+  ]);
+  await session.handleBinaryFrame(
+    {
+      kind: "tunnel",
+      frame: { opcode: TunnelOpcode.Open, streamId: "denied", workspaceId: "ws", port: 3000 },
+    },
+    source,
+  );
+  expect(binary.map(decodeTunnelFrame)).toEqual([
+    { opcode: TunnelOpcode.Close, streamId: "denied", reason: TunnelCloseReason.Forbidden },
+  ]);
+  await session.cleanup();
+});
 
 test("interruptAgentIfRunning rejects when graceful cancellation is refused", async () => {
   const agentId = "11111111-1111-4111-8111-111111111111";
@@ -329,6 +378,7 @@ interface SessionForTestOptions {
   messages?: unknown[];
   targetedMessages?: Array<{ source: object; message: SessionOutboundMessage }>;
   binaryMessages?: Uint8Array[];
+  onBinaryMessageToSource?: SessionOptions["onBinaryMessageToSource"];
   pluginRuntime?: SessionOptions["pluginRuntime"];
   orchestrationSkills?: SessionOptions["orchestrationSkills"];
   workspaceLabelService?: WorkspaceLabelService;
@@ -381,6 +431,7 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
             messages.push(message),
         }),
     onBinaryMessage: createBinaryMessageHandler(options.binaryMessages),
+    onBinaryMessageToSource: options.onBinaryMessageToSource,
     logger,
     downloadTokenStore: options.downloadTokenStore ?? asDownloadTokenStore(),
     pushNotifications: options.pushNotifications ?? asPushNotifications(),

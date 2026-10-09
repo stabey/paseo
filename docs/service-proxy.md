@@ -1,8 +1,22 @@
 # Service Proxy
 
-Paseo proxies HTTP traffic to services running inside your workspaces. Localhost service URLs are always enabled; optional public aliases and a separate service-only listener can be layered on through config.
+Paseo gives workspace services two access paths: desktop port forwarding through your existing daemon connection, and HTTP proxy URLs on the daemon host. Choose desktop forwarding when the daemon is remote and its service ports are unreachable from your device. Generated `.localhost` URLs refer to the machine opening the URL; a relay connection alone does not make those hostnames remote.
 
-## How it works
+## Desktop port forwarding
+
+Open **Scripts → Ports** in a workspace. Running managed services appear automatically. For a service started outside the workspace script runner, enter its host port and choose **Save and forward**. The daemon probes TCP reachability before the desktop opens a local listener. Arbitrary processes started by agents are not discovered in this version.
+
+Use the displayed `127.0.0.1` address on your desktop. An automatic local port prefers the host port and selects a free port if it is occupied. An explicit local port must be available. **Open** uses the selected HTTP or HTTPS scheme; **Copy address** also works for raw TCP services. Running script links offer **Forward to this device**.
+
+Port definitions are saved with the daemon workspace. Local listeners belong to the desktop window and connection: stop forwarding, reload or close the window, or disconnect the host to release them. Reconnect and select **Forward** to start again. **Remove** deletes a manual definition; **Stop forwarding** keeps it. A service must listen on IPv4 loopback or all IPv4 interfaces on the daemon host.
+
+The tunnel carries TCP bytes, including WebSocket upgrades, through the authenticated connection. Relay connections retain the existing end-to-end encryption, and the relay needs no new routes or deployment. TLS, HTTP headers, redirects, cookies, and development-server host checks are unchanged; configure the service for the displayed local origin when needed. This path does not provide a public URL or a browser/mobile HTTPS gateway.
+
+The daemon requires `tunnel.manage` and only connects to loopback ports registered in that workspace or assigned to its running managed services. This permission allows adding a manual target, so it grants access to daemon-host loopback services; workspace association is not OS process isolation. Desktop listeners bind to loopback too. Each physical connection owns its streams, including when two connections share a client ID. Removing an allowed target or revoking the permission closes affected streams.
+
+Both client and daemon need the forwarding feature. Older daemons keep their existing service links; the Ports sheet asks you to update the host.
+
+## HTTP proxy on the daemon host
 
 When a `paseo.json` script of `"type": "service"` starts, Paseo assigns it a local port and registers a route in the service proxy. Incoming requests whose `Host` header matches the script's generated hostname are forwarded to that port.
 

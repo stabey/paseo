@@ -1,3 +1,4 @@
+import { workspacePorts } from "./workspace-ports";
 export const en = {
   paneFind: {
     connectionFailure: "Could not search this chat. Check the host connection and retry.",
@@ -430,6 +431,7 @@ export const en = {
     },
   },
   workspace: {
+    ports: workspacePorts.en,
     route: {
       loading: "Loading workspace",
       connecting: "Connecting",
@@ -1906,6 +1908,7 @@ export const en = {
     dontAskAgain: "Don't ask again",
   },
   downloads: {
+    connectedSizeLimit: "Downloads over this connection are limited to 64 MiB.",
     requestTokenFailed: "Failed to request download token.",
     hostUnavailable: "Download host is unavailable.",
     cancelled: "Download was cancelled.",

@@ -175,6 +175,7 @@ function workspacePayload(): WorkspaceDescriptorPayload {
     archivingAt: null,
     diffStat: null,
     scripts: [],
+    portForwards: [{ port: 3000, label: "Preview", protocol: "http" }],
   };
 }
 
@@ -314,6 +315,9 @@ describe("ReplicaCache", () => {
 
     expect(restoredDirectory.agents.get("agent-1")?.title).toBe("Cached agent");
     expect(restoredDirectory.workspaces.get("workspace-1")?.name).toBe("main");
+    expect(restoredDirectory.workspaces.get("workspace-1")?.portForwards).toEqual([
+      { port: 3000, label: "Preview", protocol: "http" },
+    ]);
     expect(restoredDirectory.projects.get("project-1")?.projectDisplayName).toBe("Paseo");
     expect(restoredDirectory.checkpoint).toEqual({ agents: { generation: "g", afterSeq: 12 } });
     expect(restoredTimeline).toEqual(timeline());

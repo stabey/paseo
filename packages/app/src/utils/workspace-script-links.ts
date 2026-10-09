@@ -2,7 +2,7 @@ import { parseHostPort } from "@getpaseo/protocol/daemon-endpoints";
 import type { WorkspaceScriptPayload } from "@getpaseo/protocol/messages";
 import type { ActiveConnection } from "@/runtime/host-runtime";
 
-export type WorkspaceScriptLinkKind = "public" | "paseo" | "direct";
+export type WorkspaceScriptLinkKind = "public" | "paseo" | "direct" | "forwarded";
 
 export interface WorkspaceScriptLinkTarget {
   kind: WorkspaceScriptLinkKind;
@@ -70,6 +70,7 @@ function addTarget(
 export function resolveWorkspaceScriptLink(input: {
   script: WorkspaceScriptPayload;
   activeConnection: ActiveConnection | null;
+  forwardedLabel?: string;
 }): ResolvedWorkspaceScriptLink {
   const { script, activeConnection } = input;
   if (script.type !== "service" || script.lifecycle !== "running") {
@@ -84,6 +85,9 @@ export function resolveWorkspaceScriptLink(input: {
     script.publicProxyUrl ?? (!isLocalOnlyUrl(script.proxyUrl) ? script.proxyUrl : null);
 
   const targets: WorkspaceScriptLinkTarget[] = [];
+  if (input.forwardedLabel && script.port) {
+    targets.push({ kind: "forwarded", label: input.forwardedLabel, url: "" });
+  }
   addTarget(targets, "public", publicProxyUrl);
   addTarget(targets, "paseo", localProxyUrl);
   addTarget(targets, "direct", buildDirectServiceUrl(activeConnection, script.port));
