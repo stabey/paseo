@@ -119,15 +119,22 @@ function shellQuoteCliArg(value) {
   return shellQuote(String(value));
 }
 
-function getTerminalHookSmokeCommand(marker) {
+function createTerminalHookSmokeCommand(marker, cwd) {
   if (process.platform === "win32") {
-    const script = [
-      "& $env:PASEO_HOOK_CLI hooks codex Stop",
-      "if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
-      `Write-Output '${marker}'`,
-    ].join("; ");
-    const encodedScript = Buffer.from(script, "utf16le").toString("base64");
-    return `powershell.exe -NoProfile -NonInteractive -EncodedCommand ${encodedScript}`;
+    // Run through cmd.exe without bootstrapping an extra PowerShell host in
+    // ConPTY. Keep the marker in a file so command echo cannot pass the check.
+    fs.writeFileSync(
+      path.join(cwd, "paseo-hook-smoke.cmd"),
+      [
+        "@echo off",
+        'call "%PASEO_HOOK_CLI%" hooks codex Stop',
+        'if not "%errorlevel%"=="0" exit /b %errorlevel%',
+        `echo ${marker}`,
+        "exit /b 0",
+        "",
+      ].join("\r\n"),
+    );
+    return ".\\paseo-hook-smoke.cmd";
   }
 
   return `"$PASEO_HOOK_CLI" hooks codex Stop && echo ${marker}`;
@@ -737,7 +744,13 @@ async function smokeCliTerminal({ appPath, env }) {
     await runCliShimJsonCommand({
       appPath,
       env,
-      args: ["terminal", "send-keys", terminalId, getTerminalHookSmokeCommand(marker), "Enter"],
+      args: [
+        "terminal",
+        "send-keys",
+        terminalId,
+        createTerminalHookSmokeCommand(marker, cwd),
+        "Enter",
+      ],
       label: "Bundled CLI shim terminal hook command",
     });
 
