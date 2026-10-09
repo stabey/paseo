@@ -15,6 +15,7 @@ import { chromium } from "playwright";
 import { hideDeveloperToasts } from "../../app/e2e/support/developer-ui.mjs";
 import { runAppearanceFontSizeRegression } from "./appearance-font-size.electron.mjs";
 import { runSettingsMemoryRegression } from "./settings-memory.electron.mjs";
+import { runPortForwardingRegression } from "./port-forwarding.electron.mjs";
 
 import { seedPluginLinks, runPluginLinksRegression } from "./plugin-links.electron.mjs";
 
@@ -64,7 +65,9 @@ async function waitForPort(port, label, processInfo) {
       );
     }
     const connected = await new Promise((resolve) => {
-      const socket = net.createConnection({ host: "127.0.0.1", port });
+      const socket = net.createConnection(
+        typeof port === "string" ? { path: port } : { host: "127.0.0.1", port },
+      );
       socket.setTimeout(500);
       socket.once("connect", () => {
         socket.destroy();
@@ -1097,6 +1100,12 @@ async function main() {
   seedPluginLinks(paseoHome, workspaceIds[0], target.url, workspaceIds[1]);
   const remoteHome = path.join(runtimeDir, "remote-home");
   seedPaseoHome(remoteHome, `127.0.0.1:${remotePort}`, path.join(runtimeDir, "remote-workspaces"));
+  const fileHome = path.join(runtimeDir, "file-home");
+  const fileSocket =
+    process.platform === "win32"
+      ? `\\\\.\\pipe\\paseo-files-${path.basename(runtimeDir)}`
+      : path.join(runtimeDir, "files.sock");
+  seedPaseoHome(fileHome, fileSocket, path.join(runtimeDir, "file-workspaces"));
   const children = [];
   let browser = null;
   let client = null;
@@ -1155,6 +1164,25 @@ async function main() {
     children.push(remoteDaemon.child);
     await waitForPort(remotePort, "remote daemon", remoteDaemon);
 
+    const fileDaemon = spawnLogged(
+      "file-daemon",
+      process.execPath,
+      ["--import", "tsx", path.join(rootDir, "packages/server/scripts/dev-runner.ts")],
+      {
+        cwd: rootDir,
+        env: {
+          ...commonEnv,
+          PASEO_HOME: fileHome,
+          PASEO_LISTEN: fileSocket,
+          PASEO_SERVER_ID: "port-download-ipc",
+          PASEO_NODE_ENV: "development",
+        },
+      },
+      artifactDir,
+    );
+    children.push(fileDaemon.child);
+    await waitForPort(fileSocket, "file daemon", fileDaemon);
+
     const desktopArgs = [
       process.execPath,
       devRunner,
@@ -1179,6 +1207,8 @@ async function main() {
           EXPO_DEV_URL: `http://localhost:${expoPort}`,
           PASEO_ELECTRON_REMOTE_DEBUGGING_PORT: String(cdpPort),
           PASEO_ELECTRON_USER_DATA_DIR: userData,
+          // Isolated UI tests must not depend on a Chrome Web Store download.
+          PASEO_ELECTRON_SKIP_REACT_DEVTOOLS: "1",
           PASEO_ELECTRON_FLAGS: `--remote-debugging-address=127.0.0.1 --remote-debugging-port=${cdpPort}`,
         },
       },
@@ -1191,6 +1221,22 @@ async function main() {
     const page = await waitForAppPage(browser, expoPort);
     await hideDeveloperToasts(page);
     const status = await waitForDesktopStatus(page);
+
+    const portForwarding = await runPortForwardingRegression({
+      page,
+      serverId: status.serverId,
+      workspaceId: workspaceIds[0],
+      otherWorkspaceId: workspaceIds[1],
+      paseoHome,
+      fileHome,
+      fileSocket,
+      artifactDir,
+    });
+    writeJson(path.join(artifactDir, "port-forwarding.json"), portForwarding);
+    if (process.env.PASEO_DESKTOP_PORT_FORWARDING_ONLY === "1") {
+      console.log("Desktop workspace port forwarding passed.");
+      return;
+    }
 
     const checkPluginLinks = () =>
       runPluginLinksRegression({
@@ -1241,7 +1287,12 @@ async function main() {
       artifactDir,
     });
     const pluginLinks = await checkPluginLinks();
-    writeJson(path.join(artifactDir, "result.json"), { ...report, settingsMemory, pluginLinks });
+    writeJson(path.join(artifactDir, "result.json"), {
+      ...report,
+      settingsMemory,
+      pluginLinks,
+      portForwarding,
+    });
     console.log(
       `Browser desktop browser E2E passed: WebContents ${report.originalWebContentsId} remained ${report.finalWebContentsId}; viewport, inactive capture, focus continuity, list, snapshot, click, local-page selectors passed.`,
     );

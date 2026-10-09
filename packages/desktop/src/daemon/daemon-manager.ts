@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { invokePortForwarding } from "./port-forwarding-ipc.js";
 import path from "node:path";
 import { app, ipcMain, powerMonitor } from "electron";
 import log from "electron-log/main";
@@ -483,6 +484,9 @@ export function registerDaemonManager(): void {
   ipcMain.handle(
     "paseo:invoke",
     async (_event, command: string, args?: Record<string, unknown>) => {
+      if (command.startsWith("port_forwarding_")) {
+        return invokePortForwarding(_event, command, args);
+      }
       const handler = handlers[command];
       if (!handler) {
         throw new Error(`Unknown desktop command: ${command}`);

@@ -38,6 +38,7 @@ export interface UseWorkspaceScriptActionsInput {
   workspaceId: string;
   scripts: WorkspaceDescriptor["scripts"];
   onScriptTerminalStarted?: (terminalId: string) => void;
+  forwardedLabel?: string;
 }
 
 /**
@@ -53,6 +54,7 @@ export function useWorkspaceScriptActions({
   workspaceId,
   scripts,
   onScriptTerminalStarted,
+  forwardedLabel,
 }: UseWorkspaceScriptActionsInput): WorkspaceScriptActions {
   const { t } = useTranslation();
   const toast = useToast();
@@ -158,12 +160,12 @@ export function useWorkspaceScriptActions({
 
   const resolveLinks = useCallback(
     (script: WorkspaceScript): WorkspaceScriptLinks => {
-      const link = resolveWorkspaceScriptLink({ script, activeConnection });
+      const link = resolveWorkspaceScriptLink({ script, activeConnection, forwardedLabel });
       const selected =
         link.targets.find((target) => target.kind === preferredRouteKind) ?? link.primary;
       return { selected, targets: link.targets };
     },
-    [activeConnection, preferredRouteKind],
+    [activeConnection, preferredRouteKind, forwardedLabel],
   );
 
   return useMemo(

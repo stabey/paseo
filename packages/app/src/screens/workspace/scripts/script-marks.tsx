@@ -45,7 +45,8 @@ export function routeLabelKey(
 ):
   | "workspace.scripts.routes.public"
   | "workspace.scripts.routes.paseo"
-  | "workspace.scripts.routes.direct" {
+  | "workspace.scripts.routes.direct"
+  | "workspace.ports.thisDevice" {
   switch (kind) {
     case "public":
       return "workspace.scripts.routes.public";
@@ -53,6 +54,8 @@ export function routeLabelKey(
       return "workspace.scripts.routes.paseo";
     case "direct":
       return "workspace.scripts.routes.direct";
+    case "forwarded":
+      return "workspace.ports.thisDevice";
   }
 }
 

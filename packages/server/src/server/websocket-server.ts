@@ -1941,6 +1941,7 @@ export class VoiceAssistantWebSocketServer {
       features: {
         connectedHosts: true,
         hostMultiplexing: true,
+        workspacePortForwarding: session.getPermissions().includes("tunnel.manage"),
         usageSources: true,
         ownedSubscriptions: true,
         agentRequestReceipts: true,
