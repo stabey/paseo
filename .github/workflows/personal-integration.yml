@@ -36,7 +36,9 @@ jobs:
 
       - name: Set matching personal package versions
         run: |
-          version="$(node -p "require('./package.json').version.split('-')[0]")-stabey.${GITHUB_RUN_NUMBER}"
+          base_version="$(node -p "require('./package.json').version.split('-')[0]")"
+          echo "PASEO_WEB_RELEASE_VERSION=${base_version}" >> "$GITHUB_ENV"
+          version="${base_version}-stabey.${GITHUB_RUN_NUMBER}"
           npm version "$version" --no-git-tag-version --ignore-scripts
           node scripts/sync-workspace-versions.mjs --lockfile
 
@@ -94,7 +96,9 @@ jobs:
 
       - name: Set matching personal package versions
         run: |
-          version="$(node -p "require('./package.json').version.split('-')[0]")-stabey.${GITHUB_RUN_NUMBER}"
+          base_version="$(node -p "require('./package.json').version.split('-')[0]")"
+          echo "PASEO_WEB_RELEASE_VERSION=${base_version}" >> "$GITHUB_ENV"
+          version="${base_version}-stabey.${GITHUB_RUN_NUMBER}"
           npm version "$version" --no-git-tag-version --ignore-scripts
           node scripts/sync-workspace-versions.mjs --lockfile
 
