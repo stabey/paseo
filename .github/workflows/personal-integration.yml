@@ -1,0 +1,122 @@
+name: Personal Integration
+
+on:
+  push:
+    branches: [integration/stabey]
+  workflow_dispatch:
+
+concurrency:
+  group: personal-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  ONNXRUNTIME_NODE_INSTALL: skip
+
+jobs:
+  checks:
+    if: github.repository == 'stabey/paseo'
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  desktop:
+    if: github.repository == 'stabey/paseo'
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: node scripts/npm-retry.mjs ci
+
+      - name: Build personal macOS arm64 desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          PASEO_DESKTOP_SMOKE: "1"
+          PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: |
+          version="$(node -p "require('./package.json').version")-stabey.${GITHUB_RUN_NUMBER}"
+          npm run build:desktop -- --publish never --mac --arm64 \
+            --config electron-builder.personal.yml \
+            "-c.extraMetadata.version=${version}"
+
+      - name: Record desktop build provenance
+        run: |
+          node -e 'require("node:fs").writeFileSync("packages/desktop/release/build-info.json", JSON.stringify({repository:process.env.GITHUB_REPOSITORY, branch:process.env.GITHUB_REF_NAME, commit:process.env.GITHUB_SHA, run:process.env.GITHUB_RUN_ID, sourceVersion:require("./package.json").version}, null, 2)+"\n")'
+          cd packages/desktop/release
+          shasum -a 256 ./*.dmg ./*.zip > SHA256SUMS
+
+      - name: Upload desktop packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: paseo-desktop-macos-arm64-${{ github.sha }}
+          path: |
+            packages/desktop/release/*.dmg
+            packages/desktop/release/*.zip
+            packages/desktop/release/build-info.json
+            packages/desktop/release/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload packaged smoke evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: personal-desktop-smoke-${{ github.sha }}
+          path: ${{ runner.temp }}/desktop-smoke
+          if-no-files-found: ignore
+          retention-days: 7
+
+  daemon:
+    if: github.repository == 'stabey/paseo'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: node scripts/npm-retry.mjs ci
+
+      - name: Build daemon, CLI, and bundled web UI
+        run: |
+          npm run build:server
+          npm run build:daemon-web-ui
+
+      - name: Pack all local daemon dependencies
+        run: |
+          mkdir -p artifacts/daemon
+          for package in highlight relay protocol client plugin server cli; do
+            npm pack --ignore-scripts --workspace="@getpaseo/${package}" --pack-destination artifacts/daemon
+          done
+          node -e 'require("node:fs").writeFileSync("artifacts/daemon/build-info.json", JSON.stringify({repository:process.env.GITHUB_REPOSITORY, branch:process.env.GITHUB_REF_NAME, commit:process.env.GITHUB_SHA, run:process.env.GITHUB_RUN_ID, sourceVersion:require("./package.json").version}, null, 2)+"\n")'
+          cd artifacts/daemon
+          sha256sum ./*.tgz > SHA256SUMS
+
+      - name: Verify installation from local packages
+        run: |
+          npm install --prefix "$RUNNER_TEMP/paseo-personal-install" ./artifacts/daemon/*.tgz
+          "$RUNNER_TEMP/paseo-personal-install/node_modules/.bin/paseo" --version
+          test -f "$RUNNER_TEMP/paseo-personal-install/node_modules/@getpaseo/server/dist/server/web-ui/index.html"
+          node --input-type=module -e 'const p = process.env.RUNNER_TEMP + "/paseo-personal-install/node_modules/@getpaseo/server/dist/server/tunnel/tcp-stream.js"; const { TcpTunnelStream } = await import(p); if (typeof TcpTunnelStream !== "function") throw new Error("Missing personal tunnel implementation");'
+
+      - name: Upload daemon packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: paseo-daemon-${{ github.sha }}
+          path: artifacts/daemon/
+          if-no-files-found: error
+          retention-days: 30
