@@ -5,6 +5,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@server": path.resolve(__dirname, "./src"),
+      // The port-forwarding integration test imports the real desktop listener.
+      // Server CI builds sibling dependencies but runs the server itself from source.
+      "@getpaseo/server/tcp-tunnel": path.resolve(__dirname, "./src/tunnel/tcp-stream.ts"),
     },
   },
   test: {
