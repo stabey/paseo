@@ -98,6 +98,83 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  desktop-windows:
+    name: desktop-windows (${{ matrix.arch }})
+    if: github.repository == 'stabey/paseo'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      PASEO_BUILD_ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          architecture: ${{ matrix.arch }}
+          cache: npm
+
+      - name: Verify native build architecture
+        run: node -e 'require("node:assert/strict").equal(process.arch, process.env.PASEO_BUILD_ARCH)'
+
+      - name: Set matching personal package versions
+        run: |
+          base_version="$(node -p "require('./package.json').version.split('-')[0]")"
+          echo "PASEO_WEB_RELEASE_VERSION=${base_version}" >> "$GITHUB_ENV"
+          version="${base_version}-stabey.${GITHUB_RUN_NUMBER}"
+          npm version "$version" --no-git-tag-version --ignore-scripts
+          node scripts/sync-workspace-versions.mjs --lockfile
+
+      - name: Install dependencies
+        run: node scripts/npm-retry.mjs ci
+
+      - name: Build and smoke personal Windows desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          PASEO_DESKTOP_SMOKE: "1"
+          PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: npm run build:desktop -- --publish never --win "--${PASEO_BUILD_ARCH}"
+
+      - name: Record desktop build provenance
+        run: |
+          node -e 'require("node:fs").writeFileSync("packages/desktop/release/build-info.json", JSON.stringify({repository:process.env.GITHUB_REPOSITORY, branch:process.env.GITHUB_REF_NAME, commit:process.env.GITHUB_SHA, run:process.env.GITHUB_RUN_ID, version:require("./package.json").version, platform:process.platform, arch:process.arch}, null, 2)+"\n")'
+          cd packages/desktop/release
+          sha256sum ./*.exe ./*.zip > SHA256SUMS
+
+      - name: Upload desktop packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: paseo-desktop-windows-${{ matrix.arch }}-${{ github.sha }}
+          path: |
+            packages/desktop/release/*.exe
+            packages/desktop/release/*.zip
+            packages/desktop/release/build-info.json
+            packages/desktop/release/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Upload packaged smoke evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: personal-desktop-smoke-windows-${{ matrix.arch }}-${{ github.sha }}
+          path: ${{ runner.temp }}/desktop-smoke
+          if-no-files-found: ignore
+          retention-days: 7
+
   daemon:
     if: github.repository == 'stabey/paseo'
     runs-on: ubuntu-latest

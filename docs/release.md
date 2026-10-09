@@ -85,11 +85,15 @@ workspace port forwarding. Keep the source branches and merge commits so each
 feature remains traceable. Update this branch by merging a freshly fetched
 `origin/main`; push it to `fork`, which points to `stabey/paseo`.
 
-Every push runs **Personal Integration**: the existing full CI workflow, a macOS
-arm64 desktop build with a packaged smoke test, and standalone daemon/CLI packages
-with the browser UI. Builds run alongside the checks; install artifacts only from
-a successful workflow run. Actions retains the packages for 30 days. Each archive
-includes the source commit in `build-info.json` and package hashes in `SHA256SUMS`.
+Every push runs **Personal Integration**: the existing full CI workflow, macOS
+arm64 and Windows x64/arm64 desktop builds, and standalone daemon/CLI packages
+with the browser UI. Each desktop architecture builds on a matching native runner
+and runs the packaged smoke test, including the renderer, bundled daemon, and CLI.
+Windows artifacts contain an NSIS `.exe` installer and a `.zip` for each architecture;
+choose x64 for Intel/AMD PCs or arm64 for Windows on Arm. Builds run alongside the
+checks; install artifacts only from a successful workflow run. Actions retains the
+packages for 30 days. Each archive includes the source commit in `build-info.json`
+and package hashes in `SHA256SUMS`.
 
 All packages receive the same `-stabey.<run number>` version in the build
 checkout, including their internal dependency ranges. The version sync's
@@ -99,13 +103,14 @@ version with the daemon it owns; changing only the app's version causes needless
 daemon restarts. Web exports set `PASEO_WEB_RELEASE_VERSION` to the upstream base
 version because Expo also evaluates native build numbers, whose format excludes
 private prerelease suffixes. Keep this override out of native mobile builds.
-The desktop build uses an ad-hoc signature without Apple
+The macOS desktop build uses an ad-hoc signature without Apple
 notarization. Its personal entitlements disable library validation for the app and
 helpers because ad-hoc signatures have no Team ID; otherwise macOS rejects the
 Electron framework at launch. Keep Hardened Runtime enabled and keep this exception
 out of the official signing configuration. CI checks the signed entitlements in
 addition to the packaged smoke test. macOS may require approval in Privacy & Security on first launch.
-Its updater points to `stabey/paseo`; these CI runs upload Actions artifacts
+Windows packages have no code-signing certificate. The desktop updater points to
+`stabey/paseo`; these CI runs upload Actions artifacts
 without publishing GitHub Releases or update manifests,
 so install subsequent CI builds manually.
 
