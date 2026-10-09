@@ -741,6 +741,7 @@ async function smokeCliTerminal({ appPath, env }) {
       label: "Bundled CLI shim terminal hook command",
     });
 
+    let lastCapture = null;
     for (let attempt = 1; attempt <= TERMINAL_CAPTURE_ATTEMPTS; attempt += 1) {
       const capture = await runCliShimJsonCommand({
         appPath,
@@ -748,6 +749,7 @@ async function smokeCliTerminal({ appPath, env }) {
         args: ["terminal", "capture", terminalId, "--scrollback"],
         label: "Bundled CLI shim terminal capture",
       });
+      lastCapture = capture;
       const lines = Array.isArray(capture?.lines) ? capture.lines : [];
       if (lines.join("\n").includes(marker)) {
         console.log("Packaged desktop smoke: terminal hook command completed");
@@ -759,7 +761,9 @@ async function smokeCliTerminal({ appPath, env }) {
       }
     }
 
-    throw new Error(`Timed out waiting for terminal capture marker ${marker}`);
+    throw new Error(
+      `Timed out waiting for terminal capture marker ${marker}\nLast terminal capture:\n${JSON.stringify(lastCapture, null, 2)}`,
+    );
   } finally {
     if (terminalId) {
       await runCliShimJsonCommand({
