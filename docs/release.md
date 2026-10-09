@@ -96,7 +96,10 @@ checkout, including their internal dependency ranges. The version sync's
 `--lockfile` option updates local package metadata while preserving the locked
 third-party dependencies. The desktop compares its
 version with the daemon it owns; changing only the app's version causes needless
-daemon restarts. The desktop build uses an ad-hoc signature without Apple
+daemon restarts. Web exports set `PASEO_WEB_RELEASE_VERSION` to the upstream base
+version because Expo also evaluates native build numbers, whose format excludes
+private prerelease suffixes. Keep this override out of native mobile builds.
+The desktop build uses an ad-hoc signature without Apple
 notarization. macOS may require approval in Privacy & Security on first launch.
 Its updater points to `stabey/paseo`; these CI runs upload Actions artifacts
 without publishing GitHub Releases or update manifests,

@@ -94,7 +94,11 @@ const variants = {
 };
 
 const variant = variants[appVariant] ?? variants.production;
-const nativeReleaseVersion = getNativeReleaseVersion(pkg.version);
+// Private desktop/daemon web exports still evaluate the native metadata below.
+// Their CI passes the upstream version here while packages keep a private suffix.
+const nativeReleaseVersion = getNativeReleaseVersion(
+  process.env.PASEO_WEB_RELEASE_VERSION ?? pkg.version,
+);
 
 export default {
   expo: {
