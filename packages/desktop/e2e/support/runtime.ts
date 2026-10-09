@@ -244,6 +244,10 @@ export async function installDesktopRuntime(
           return buildDaemonStatus();
         }
 
+        if (command === "desktop_local_daemon_candidates") {
+          return [];
+        }
+
         if (command === "desktop_daemon_logs") {
           return { logPath: cfg.daemonLogPath ?? "", contents: "" };
         }

@@ -206,6 +206,9 @@ async function installPendingDesktopBridge(page: Page): Promise<void> {
     (window as unknown as { paseoDesktop: unknown }).paseoDesktop = {
       platform: "darwin",
       invoke: async (command: string) => {
+        if (command === "desktop_local_daemon_candidates") {
+          return [];
+        }
         if (command === "start_desktop_daemon") {
           await new Promise(() => {
             // Keep the daemon in the startup phase until the test ends.
