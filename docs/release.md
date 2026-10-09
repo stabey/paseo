@@ -96,8 +96,10 @@ packages for 30 days. Each archive includes the source commit in `build-info.jso
 and package hashes in `SHA256SUMS`.
 
 On Windows ARM64, the locked Cloudflare `workerd` installer rejects the platform.
-CI skips that deployment tool's installer and replays the other dependency scripts,
-including native modules and repository patches. Desktop builds do not use `workerd`.
+CI replays required dependency scripts and repository patches, excluding that
+unused deployment tool. Optional native accelerators keep their JavaScript
+fallbacks; rebuilding them would turn an optional compiler failure into a failed
+installation. Required native modules still install and pass the packaged smoke test.
 
 All packages receive the same `-stabey.<run number>` version in the build
 checkout, including their internal dependency ranges. The version sync's
