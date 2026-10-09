@@ -137,7 +137,30 @@ jobs:
           node scripts/sync-workspace-versions.mjs --lockfile
 
       - name: Install dependencies
-        run: node scripts/npm-retry.mjs ci --foreground-scripts
+        run: |
+          if [[ "$PASEO_BUILD_ARCH" == "arm64" ]]; then
+            node scripts/npm-retry.mjs ci --ignore-scripts
+            # workerd is a Cloudflare deployment tool with no Windows ARM64 binary.
+            # Desktop builds do not use it. Replay every other dependency's scripts.
+            node <<'NODE'
+          const fs = require("node:fs");
+          const assert = require("node:assert/strict");
+          for (const packagePath of Object.keys(require("./package-lock.json").packages)) {
+            if (!packagePath.endsWith("node_modules/workerd")) continue;
+            const manifest = `${packagePath}/package.json`;
+            if (!fs.existsSync(manifest)) continue;
+            const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
+            assert.equal(pkg.scripts.postinstall, "node install.js");
+            delete pkg.scripts.postinstall;
+            fs.writeFileSync(manifest, JSON.stringify(pkg, null, 2) + "\n");
+            console.log(`Skipped unsupported workerd installer: ${packagePath}`);
+          }
+          NODE
+            npm rebuild --foreground-scripts
+            npm run postinstall
+          else
+            node scripts/npm-retry.mjs ci --foreground-scripts
+          fi
 
       - name: Build and smoke personal Windows desktop
         env:
