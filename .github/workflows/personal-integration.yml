@@ -137,7 +137,7 @@ jobs:
           node scripts/sync-workspace-versions.mjs --lockfile
 
       - name: Install dependencies
-        run: node scripts/npm-retry.mjs ci
+        run: node scripts/npm-retry.mjs ci --foreground-scripts
 
       - name: Build and smoke personal Windows desktop
         env:
@@ -145,11 +145,31 @@ jobs:
           PASEO_DESKTOP_SMOKE: "1"
           PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
           NODE_OPTIONS: --max-old-space-size=8192
-        run: npm run build:desktop -- --publish never --win "--${PASEO_BUILD_ARCH}"
+        # Explicit targets override the shared config's dual-architecture target list.
+        run: npm run build:desktop -- --publish never --win nsis zip "--${PASEO_BUILD_ARCH}"
 
       - name: Record desktop build provenance
         run: |
-          node -e 'require("node:fs").writeFileSync("packages/desktop/release/build-info.json", JSON.stringify({repository:process.env.GITHUB_REPOSITORY, branch:process.env.GITHUB_REF_NAME, commit:process.env.GITHUB_SHA, run:process.env.GITHUB_RUN_ID, version:require("./package.json").version, platform:process.platform, arch:process.arch}, null, 2)+"\n")'
+          node <<'NODE'
+          const fs = require("node:fs");
+          const assert = require("node:assert/strict");
+          const releaseDir = "packages/desktop/release";
+          const version = require("./package.json").version;
+          const arch = process.env.PASEO_BUILD_ARCH;
+          const packages = fs.readdirSync(releaseDir).filter(name => /\.(exe|zip)$/.test(name)).sort();
+          const expected = ["exe", "zip"].map(ext => `Paseo-Setup-${version}-${arch}.${ext}`).sort();
+          assert.deepEqual(packages, expected, "Expected an installer and zip for this architecture only");
+          fs.writeFileSync(`${releaseDir}/build-info.json`, JSON.stringify({
+            repository: process.env.GITHUB_REPOSITORY,
+            branch: process.env.GITHUB_REF_NAME,
+            commit: process.env.GITHUB_SHA,
+            run: process.env.GITHUB_RUN_ID,
+            version,
+            platform: process.platform,
+            arch,
+          }, null, 2) + "\n");
+          console.log(`Verified Windows ${arch} packages: ${packages.join(", ")}`);
+          NODE
           cd packages/desktop/release
           sha256sum ./*.exe ./*.zip > SHA256SUMS
 
