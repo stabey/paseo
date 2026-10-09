@@ -120,10 +120,24 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        id: setup-node
         with:
           node-version: "22"
           architecture: ${{ matrix.arch }}
           cache: npm
+
+      - name: Locate npm download cache
+        if: matrix.arch == 'arm64' && steps.setup-node.outputs.cache-hit != 'true'
+        id: npm-cache
+        run: echo "path=$(npm config get cache)" >> "$GITHUB_OUTPUT"
+
+      - name: Seed ARM64 npm downloads from the x64 cache
+        if: matrix.arch == 'arm64' && steps.setup-node.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          # npm's cache contains tarballs, not installed native modules.
+          path: ${{ steps.npm-cache.outputs.path }}
+          key: node-cache-${{ runner.os }}-x64-npm-${{ hashFiles('package-lock.json') }}
 
       - name: Verify native build architecture
         run: node -e 'require("node:assert/strict").equal(process.arch, process.env.PASEO_BUILD_ARCH)'
@@ -141,22 +155,24 @@ jobs:
           if [[ "$PASEO_BUILD_ARCH" == "arm64" ]]; then
             node scripts/npm-retry.mjs ci --ignore-scripts
             # workerd is a Cloudflare deployment tool with no Windows ARM64 binary.
-            # Desktop builds do not use it. Replay every other dependency's scripts.
+            # Replay required scripts; optional native accelerators retain their JS fallbacks.
             node <<'NODE'
           const fs = require("node:fs");
-          const assert = require("node:assert/strict");
-          for (const packagePath of Object.keys(require("./package-lock.json").packages)) {
-            if (!packagePath.endsWith("node_modules/workerd")) continue;
+          const { spawnSync } = require("node:child_process");
+          const packages = new Set();
+          for (const [packagePath, metadata] of Object.entries(require("./package-lock.json").packages)) {
+            if (!packagePath || metadata.optional || !metadata.hasInstallScript) continue;
             const manifest = `${packagePath}/package.json`;
             if (!fs.existsSync(manifest)) continue;
             const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
-            assert.equal(pkg.scripts.postinstall, "node install.js");
-            delete pkg.scripts.postinstall;
-            fs.writeFileSync(manifest, JSON.stringify(pkg, null, 2) + "\n");
-            console.log(`Skipped unsupported workerd installer: ${packagePath}`);
+            if (pkg.name !== "workerd") packages.add(pkg.name);
           }
+          if (!packages.has("node-pty") || !packages.has("esbuild")) throw new Error("Missing required native build dependencies");
+          console.log(`Rebuilding required dependencies: ${[...packages].join(", ")}`);
+          const result = spawnSync("npm.cmd", ["rebuild", "--foreground-scripts", ...packages], { stdio: "inherit", shell: true });
+          if (result.error) throw result.error;
+          process.exit(result.status ?? 1);
           NODE
-            npm rebuild --foreground-scripts
             npm run postinstall
           else
             node scripts/npm-retry.mjs ci --foreground-scripts
