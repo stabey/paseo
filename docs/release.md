@@ -97,6 +97,12 @@ Security on first launch. Its updater points to `stabey/paseo`; these CI runs
 upload Actions artifacts without publishing GitHub Releases or update manifests,
 so install subsequent CI builds manually.
 
+GitHub can pause inherited workflows on forks to reduce unused compute. If a
+dispatch says Actions is disabled while the permissions API says it is enabled,
+open the fork's Actions page and use its **re-enable** button. Updating the
+repository permissions or enabling one workflow through the API does not clear
+that fork-specific pause.
+
 The daemon archive contains all seven local npm packages. With Node.js 22 or
 newer installed, extract it outside a source checkout and install the tarballs
 together:
