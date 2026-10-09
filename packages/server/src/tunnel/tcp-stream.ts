@@ -5,7 +5,7 @@ import {
   TunnelCloseReason,
   TunnelOpcode,
   type TunnelFrame,
-} from "@getpaseo/protocol/binary-frames/index";
+} from "@getpaseo/protocol/binary-frames/tunnel";
 
 export interface TcpTunnelStreamOptions {
   streamId: string;

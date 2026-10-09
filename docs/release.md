@@ -91,10 +91,15 @@ with the browser UI. Builds run alongside the checks; install artifacts only fro
 a successful workflow run. Actions retains the packages for 30 days. Each archive
 includes the source commit in `build-info.json` and package hashes in `SHA256SUMS`.
 
-The desktop build uses an ad-hoc signature without Apple notarization and a
-`-stabey.<run number>` version suffix. macOS may require approval in Privacy &
-Security on first launch. Its updater points to `stabey/paseo`; these CI runs
-upload Actions artifacts without publishing GitHub Releases or update manifests,
+All packages receive the same `-stabey.<run number>` version in the build
+checkout, including their internal dependency ranges. The version sync's
+`--lockfile` option updates local package metadata while preserving the locked
+third-party dependencies. The desktop compares its
+version with the daemon it owns; changing only the app's version causes needless
+daemon restarts. The desktop build uses an ad-hoc signature without Apple
+notarization. macOS may require approval in Privacy & Security on first launch.
+Its updater points to `stabey/paseo`; these CI runs upload Actions artifacts
+without publishing GitHub Releases or update manifests,
 so install subsequent CI builds manually.
 
 GitHub can pause inherited workflows on forks to reduce unused compute. If a
@@ -111,10 +116,9 @@ together:
 npm install -g ./getpaseo-*.tgz
 ```
 
-Installing only the CLI tarball can resolve official dependency packages from
-npm. The daemon keeps the upstream package version; use `build-info.json` to
-identify the integration commit. Replacing packages does not authorize restarting
-a running daemon. Official mobile apps keep their existing protocol features;
+Install every tarball together so internal dependencies resolve to this build.
+Use `build-info.json` to identify the integration commit. Replacing packages does
+not authorize restarting a running daemon. Official mobile apps keep their existing protocol features;
 desktop port forwarding requires this branch's desktop and daemon.
 
 ## ACP catalog updates

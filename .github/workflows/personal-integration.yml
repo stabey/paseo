@@ -34,6 +34,12 @@ jobs:
           node-version: "22"
           cache: npm
 
+      - name: Set matching personal package versions
+        run: |
+          version="$(node -p "require('./package.json').version.split('-')[0]")-stabey.${GITHUB_RUN_NUMBER}"
+          npm version "$version" --no-git-tag-version --ignore-scripts
+          node scripts/sync-workspace-versions.mjs --lockfile
+
       - name: Install dependencies
         run: node scripts/npm-retry.mjs ci
 
@@ -44,14 +50,12 @@ jobs:
           PASEO_DESKTOP_SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/desktop-smoke
           NODE_OPTIONS: --max-old-space-size=8192
         run: |
-          version="$(node -p "require('./package.json').version")-stabey.${GITHUB_RUN_NUMBER}"
           npm run build:desktop -- --publish never --mac --arm64 \
-            --config electron-builder.personal.yml \
-            "-c.extraMetadata.version=${version}"
+            --config electron-builder.personal.yml
 
       - name: Record desktop build provenance
         run: |
-          node -e 'require("node:fs").writeFileSync("packages/desktop/release/build-info.json", JSON.stringify({repository:process.env.GITHUB_REPOSITORY, branch:process.env.GITHUB_REF_NAME, commit:process.env.GITHUB_SHA, run:process.env.GITHUB_RUN_ID, sourceVersion:require("./package.json").version}, null, 2)+"\n")'
+          node -e 'require("node:fs").writeFileSync("packages/desktop/release/build-info.json", JSON.stringify({repository:process.env.GITHUB_REPOSITORY, branch:process.env.GITHUB_REF_NAME, commit:process.env.GITHUB_SHA, run:process.env.GITHUB_RUN_ID, version:require("./package.json").version}, null, 2)+"\n")'
           cd packages/desktop/release
           shasum -a 256 ./*.dmg ./*.zip > SHA256SUMS
 
@@ -88,6 +92,12 @@ jobs:
           node-version: "22"
           cache: npm
 
+      - name: Set matching personal package versions
+        run: |
+          version="$(node -p "require('./package.json').version.split('-')[0]")-stabey.${GITHUB_RUN_NUMBER}"
+          npm version "$version" --no-git-tag-version --ignore-scripts
+          node scripts/sync-workspace-versions.mjs --lockfile
+
       - name: Install dependencies
         run: node scripts/npm-retry.mjs ci
 
@@ -102,7 +112,7 @@ jobs:
           for package in highlight relay protocol client plugin server cli; do
             npm pack --ignore-scripts --workspace="@getpaseo/${package}" --pack-destination artifacts/daemon
           done
-          node -e 'require("node:fs").writeFileSync("artifacts/daemon/build-info.json", JSON.stringify({repository:process.env.GITHUB_REPOSITORY, branch:process.env.GITHUB_REF_NAME, commit:process.env.GITHUB_SHA, run:process.env.GITHUB_RUN_ID, sourceVersion:require("./package.json").version}, null, 2)+"\n")'
+          node -e 'require("node:fs").writeFileSync("artifacts/daemon/build-info.json", JSON.stringify({repository:process.env.GITHUB_REPOSITORY, branch:process.env.GITHUB_REF_NAME, commit:process.env.GITHUB_SHA, run:process.env.GITHUB_RUN_ID, version:require("./package.json").version}, null, 2)+"\n")'
           cd artifacts/daemon
           sha256sum ./*.tgz > SHA256SUMS
 

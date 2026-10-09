@@ -1,6 +1,6 @@
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { z } from "zod";
-import { decodeTunnelFrame, encodeTunnelFrame } from "@getpaseo/protocol/binary-frames/index";
+import { decodeTunnelFrame, encodeTunnelFrame } from "@getpaseo/protocol/binary-frames/tunnel";
 import { PortForwarding } from "./port-forwarding.js";
 
 const instances = new Map<WebContents, PortForwarding>();
