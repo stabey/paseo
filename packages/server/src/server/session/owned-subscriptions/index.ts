@@ -385,6 +385,21 @@ export class SessionDelivery {
       this.proofs.set(frame, owner);
   }
 
+  /** A binary domain owns its streams; delivery binds its sender to this physical source lifetime. */
+  binarySender(
+    socket: object,
+    send: (socket: object, frame: Uint8Array) => Promise<void>,
+  ): (frame: Uint8Array) => Promise<void> {
+    const source = this.sources.get(socket);
+    if (!source?.active || this.closing) throw new Error("Binary source is closed");
+    const owner: DeliveryOwner = { source, active: true };
+    return async (frame) => {
+      if (!source.active || this.closing) throw new Error("Binary source is closed");
+      this.proofs.set(frame, owner);
+      await send(socket, frame);
+    };
+  }
+
   permitsBinary(socket: object, frame: Uint8Array): boolean {
     const source = this.sources.get(socket);
     if (!source?.active) return false;

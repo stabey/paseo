@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 
 import type { Logger } from "pino";
 import { z } from "zod";
+import { WorkspacePortSchema } from "@getpaseo/protocol/workspace-ports";
 
 import { writeJsonFileAtomic } from "./atomic-file.js";
 import { areEquivalentPaths } from "../utils/path.js";
@@ -49,6 +50,7 @@ const PersistedProjectRecordSchema = z.object({
 });
 
 const PersistedWorkspaceRecordSchema = z.object({
+  portForwards: z.array(WorkspacePortSchema).max(64).optional(),
   workspaceId: z.string(),
   projectId: z.string(),
   cwd: z.string(),

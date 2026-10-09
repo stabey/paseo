@@ -1,4 +1,8 @@
-import { useCallback, useMemo, type ReactElement } from "react";
+import { useCallback, useMemo, useState, type ReactElement } from "react";
+import * as Clipboard from "expo-clipboard";
+import { useMutation } from "@tanstack/react-query";
+import { useSessionStore } from "@/stores/session-store";
+import { useToast } from "@/contexts/toast-context";
 import type { GestureResponderEvent } from "react-native";
 import { Pressable, Text, View } from "react-native";
 import {
@@ -36,6 +40,9 @@ import {
   useWorkspaceScriptActions,
   type WorkspaceScriptActions,
 } from "./use-workspace-script-actions";
+import { isElectronRuntime } from "@/desktop/host";
+import { getPortForwarding } from "@/port-forwarding/desktop";
+import { WorkspacePortsSheet } from "@/port-forwarding/workspace-ports-sheet";
 
 type RowActionIcon = "copy" | "open" | "restart" | "start" | "stop" | "terminal";
 
@@ -307,6 +314,7 @@ interface ScriptRowProps {
   actions: WorkspaceScriptActions;
   onViewTerminal?: (terminalId: string) => void;
   onOpenUrlInBrowserTab?: (url: string) => void;
+  onForwardService?: (port: number, action: "open" | "copy") => void;
 }
 
 function ScriptRow({
@@ -315,6 +323,7 @@ function ScriptRow({
   actions,
   onViewTerminal,
   onOpenUrlInBrowserTab,
+  onForwardService,
 }: ScriptRowProps): ReactElement {
   const { t } = useTranslation();
   const isRunning = script.lifecycle === "running";
@@ -329,8 +338,20 @@ function ScriptRow({
   const handleOpenService = useCallback(() => {
     if (!selectedLink) return;
     closeMenu();
+    if (selectedLink.kind === "forwarded" && script.port) {
+      onForwardService?.(script.port, "open");
+      return;
+    }
     void openServiceUrl(selectedLink.url, { openInApp: onOpenUrlInBrowserTab });
-  }, [selectedLink, closeMenu, onOpenUrlInBrowserTab]);
+  }, [selectedLink, closeMenu, onOpenUrlInBrowserTab, onForwardService, script.port]);
+
+  const handleCopyService = useCallback(
+    (target: WorkspaceScriptLinkTarget) => {
+      if (target.kind === "forwarded" && script.port) onForwardService?.(script.port, "copy");
+      else actions.copyUrl(target);
+    },
+    [script.port, onForwardService, actions.copyUrl],
+  );
 
   const handleView = useCallback(() => {
     if (liveTerminalId) onViewTerminal?.(liveTerminalId);
@@ -439,7 +460,7 @@ function ScriptRow({
             targets={linkTargets}
             scriptName={script.scriptName}
             onSelectKind={actions.selectRoute}
-            onCopy={actions.copyUrl}
+            onCopy={handleCopyService}
           />
         </View>
       ) : null}
@@ -458,11 +479,37 @@ export function WorkspaceScriptsButton({
   hideLabels,
 }: WorkspaceScriptsButtonProps): ReactElement | null {
   const { t } = useTranslation();
+  const toast = useToast();
+  const client = useSessionStore((state) => state.sessions[serverId]?.client ?? null);
+  const supportsForwarding = useSessionStore(
+    (state) => state.sessions[serverId]?.serverInfo?.features?.workspacePortForwarding === true,
+  );
+  const [portsVisible, setPortsVisible] = useState(false);
+  const showPorts = useCallback(() => setPortsVisible(true), []);
+  const hidePorts = useCallback(() => setPortsVisible(false), []);
+  const isDesktop = isElectronRuntime();
+  const forwardService = useMutation({
+    mutationFn: async ({ port, action }: { port: number; action: "open" | "copy" }) => {
+      if (!client) throw new Error(t("common.errors.daemonClientUnavailable"));
+      const forward = await getPortForwarding(client).start({ workspaceId, port });
+      const url = `http://127.0.0.1:${forward.localPort}`;
+      if (action === "copy") {
+        await Clipboard.setStringAsync(url);
+        toast.copied(url);
+      } else await openServiceUrl(url, { openInApp: onOpenUrlInBrowserTab });
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const handleForwardService = useCallback(
+    (port: number, action: "open" | "copy") => forwardService.mutate({ port, action }),
+    [forwardService],
+  );
   const actions = useWorkspaceScriptActions({
     serverId,
     workspaceId,
     scripts,
     onScriptTerminalStarted,
+    forwardedLabel: isDesktop && supportsForwarding ? t("workspace.ports.thisDevice") : undefined,
   });
   const liveTerminalIdSet = useMemo(() => new Set(liveTerminalIds), [liveTerminalIds]);
 
@@ -474,7 +521,7 @@ export function WorkspaceScriptsButton({
     [],
   );
 
-  if (scripts.length === 0) {
+  if (scripts.length === 0 && !isDesktop) {
     return null;
   }
 
@@ -514,11 +561,27 @@ export function WorkspaceScriptsButton({
                 actions={actions}
                 onViewTerminal={onViewTerminal}
                 onOpenUrlInBrowserTab={onOpenUrlInBrowserTab}
+                onForwardService={
+                  isDesktop && supportsForwarding ? handleForwardService : undefined
+                }
               />
             ))}
+            {isDesktop ? (
+              <DropdownMenuItem testID="workspace-ports-menu-item" onSelect={showPorts}>
+                {t("workspace.ports.title")}
+              </DropdownMenuItem>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </View>
+      {portsVisible ? (
+        <WorkspacePortsSheet
+          serverId={serverId}
+          workspaceId={workspaceId}
+          onClose={hidePorts}
+          onOpenUrlInBrowserTab={onOpenUrlInBrowserTab}
+        />
+      ) : null}
     </View>
   );
 }
