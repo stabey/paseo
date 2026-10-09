@@ -77,6 +77,40 @@ or beta version. Ensure the fixes and changelog also reach `main` and any active
 `next`, preserving newer development and version changes there. This is a
 short-lived hotfix branch, not another maintained release track.
 
+## Personal integration branch
+
+`integration/stabey` in `stabey/paseo` combines upstream `main`, the project search
+roots change (PR #5460), existing local daemon reuse (PR #6314), and desktop
+workspace port forwarding. Keep the source branches and merge commits so each
+feature remains traceable. Update this branch by merging a freshly fetched
+`origin/main`; push it to `fork`, which points to `stabey/paseo`.
+
+Every push runs **Personal Integration**: the existing full CI workflow, a macOS
+arm64 desktop build with a packaged smoke test, and standalone daemon/CLI packages
+with the browser UI. Builds run alongside the checks; install artifacts only from
+a successful workflow run. Actions retains the packages for 30 days. Each archive
+includes the source commit in `build-info.json` and package hashes in `SHA256SUMS`.
+
+The desktop build uses an ad-hoc signature without Apple notarization and a
+`-stabey.<run number>` version suffix. macOS may require approval in Privacy &
+Security on first launch. Its updater points to `stabey/paseo`; these CI runs
+upload Actions artifacts without publishing GitHub Releases or update manifests,
+so install subsequent CI builds manually.
+
+The daemon archive contains all seven local npm packages. With Node.js 22 or
+newer installed, extract it outside a source checkout and install the tarballs
+together:
+
+```bash
+npm install -g ./getpaseo-*.tgz
+```
+
+Installing only the CLI tarball can resolve official dependency packages from
+npm. The daemon keeps the upstream package version; use `build-info.json` to
+identify the integration commit. Replacing packages does not authorize restarting
+a running daemon. Official mobile apps keep their existing protocol features;
+desktop port forwarding requires this branch's desktop and daemon.
+
 ## ACP catalog updates
 
 ACP catalog work enters a release through an explicit user request:
