@@ -85,6 +85,40 @@ for (const workspacePath of workspacePaths) {
   }
 }
 
+// CI builds can stamp a personal version without resolving new third-party
+// dependencies. Keep the existing lockfile graph and update only local metadata.
+function syncLockfile() {
+  const lockfilePath = path.join(rootDir, "package-lock.json");
+  const lockfile = JSON.parse(readFileSync(lockfilePath, "utf8"));
+  lockfile.version = rootVersion;
+
+  for (const workspacePath of ["", ...workspacePaths]) {
+    const packagePath = path.join(rootDir, workspacePath, "package.json");
+    const pkg = JSON.parse(readFileSync(packagePath, "utf8"));
+    const entry = lockfile.packages[workspacePath];
+    if (!entry) {
+      throw new Error(`Missing lockfile entry for ${workspacePath || "root"}`);
+    }
+    entry.version = pkg.version;
+    for (const section of dependencySections) {
+      for (const [name, range] of Object.entries(pkg[section] ?? {})) {
+        if (!name.startsWith("@getpaseo/") || name === pkg.name) {
+          continue;
+        }
+        if (!entry[section] || !(name in entry[section])) {
+          throw new Error(`Missing lockfile dependency ${workspacePath}:${section}:${name}`);
+        }
+        entry[section][name] = range;
+      }
+    }
+  }
+  writeFileSync(lockfilePath, `${JSON.stringify(lockfile, null, 2)}\n`);
+}
+
+if (process.argv.includes("--lockfile")) {
+  syncLockfile();
+}
+
 if (touched.length === 0) {
   console.log(`Workspace versions and internal deps already synced to ${rootVersion}`);
 } else {
