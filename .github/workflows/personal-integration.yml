@@ -99,45 +99,23 @@ jobs:
           retention-days: 7
 
   desktop-windows:
-    name: desktop-windows (${{ matrix.arch }})
+    name: desktop-windows (x64)
     if: github.repository == 'stabey/paseo'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: x64
-            runner: windows-latest
-          - arch: arm64
-            runner: windows-11-arm
-    runs-on: ${{ matrix.runner }}
+    runs-on: windows-latest
     timeout-minutes: 45
     defaults:
       run:
         shell: bash
     env:
-      PASEO_BUILD_ARCH: ${{ matrix.arch }}
+      PASEO_BUILD_ARCH: x64
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
-        id: setup-node
         with:
           node-version: "22"
-          architecture: ${{ matrix.arch }}
+          architecture: x64
           cache: npm
-
-      - name: Locate npm download cache
-        if: matrix.arch == 'arm64' && steps.setup-node.outputs.cache-hit != 'true'
-        id: npm-cache
-        run: echo "path=$(npm config get cache)" >> "$GITHUB_OUTPUT"
-
-      - name: Seed ARM64 npm downloads from the x64 cache
-        if: matrix.arch == 'arm64' && steps.setup-node.outputs.cache-hit != 'true'
-        uses: actions/cache/restore@v4
-        with:
-          # npm's cache contains tarballs, not installed native modules.
-          path: ${{ steps.npm-cache.outputs.path }}
-          key: node-cache-${{ runner.os }}-x64-npm-${{ hashFiles('package-lock.json') }}
 
       - name: Verify native build architecture
         run: node -e 'require("node:assert/strict").equal(process.arch, process.env.PASEO_BUILD_ARCH)'
@@ -151,32 +129,7 @@ jobs:
           node scripts/sync-workspace-versions.mjs --lockfile
 
       - name: Install dependencies
-        run: |
-          if [[ "$PASEO_BUILD_ARCH" == "arm64" ]]; then
-            node scripts/npm-retry.mjs ci --ignore-scripts
-            # workerd is a Cloudflare deployment tool with no Windows ARM64 binary.
-            # Replay required scripts; optional native accelerators retain their JS fallbacks.
-            node <<'NODE'
-          const fs = require("node:fs");
-          const { spawnSync } = require("node:child_process");
-          const packages = new Set();
-          for (const [packagePath, metadata] of Object.entries(require("./package-lock.json").packages)) {
-            if (!packagePath || metadata.optional || !metadata.hasInstallScript) continue;
-            const manifest = `${packagePath}/package.json`;
-            if (!fs.existsSync(manifest)) continue;
-            const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
-            if (pkg.name !== "workerd") packages.add(pkg.name);
-          }
-          if (!packages.has("node-pty") || !packages.has("esbuild")) throw new Error("Missing required native build dependencies");
-          console.log(`Rebuilding required dependencies: ${[...packages].join(", ")}`);
-          const result = spawnSync("npm.cmd", ["rebuild", "--foreground-scripts", ...packages], { stdio: "inherit", shell: true });
-          if (result.error) throw result.error;
-          process.exit(result.status ?? 1);
-          NODE
-            npm run postinstall
-          else
-            node scripts/npm-retry.mjs ci --foreground-scripts
-          fi
+        run: node scripts/npm-retry.mjs ci --foreground-scripts
 
       - name: Build and smoke personal Windows desktop
         env:
@@ -215,7 +168,7 @@ jobs:
       - name: Upload desktop packages
         uses: actions/upload-artifact@v4
         with:
-          name: paseo-desktop-windows-${{ matrix.arch }}-${{ github.sha }}
+          name: paseo-desktop-windows-x64-${{ github.sha }}
           path: |
             packages/desktop/release/*.exe
             packages/desktop/release/*.zip
@@ -229,7 +182,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: personal-desktop-smoke-windows-${{ matrix.arch }}-${{ github.sha }}
+          name: personal-desktop-smoke-windows-x64-${{ github.sha }}
           path: ${{ runner.temp }}/desktop-smoke
           if-no-files-found: ignore
           retention-days: 7
