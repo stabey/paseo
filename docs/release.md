@@ -81,9 +81,19 @@ short-lived hotfix branch, not another maintained release track.
 
 `integration/stabey` in `stabey/paseo` combines upstream `main`, the project search
 roots change (PR #5460), existing local daemon reuse (PR #6314), and desktop
-workspace port forwarding. Keep the source branches and merge commits so each
-feature remains traceable. Update this branch by merging a freshly fetched
-`origin/main`; push it to `fork`, which points to `stabey/paseo`.
+workspace port forwarding. Keep personal commits as a linear stack on top of the
+latest `origin/main`. Preserve the original PR branches so each feature remains
+traceable.
+
+To sync upstream, fetch `origin/main` and `fork/integration/stabey`, record the
+remote integration commit, and create a backup branch at the current integration
+tip. Rebase with `git rebase origin/main`; resolve conflicts without dropping
+either upstream fixes or personal behavior. Compare the resulting tree with the
+combined upstream and previous integration changes, then run the relevant tests,
+lint, and typecheck. Push only `integration/stabey` to `fork` with an explicit
+`--force-with-lease=refs/heads/integration/stabey:<recorded-remote-commit>`. If the
+lease fails, inspect the new remote commits before retrying. This sync rewrites
+the personal integration history, not the original PR branches or upstream main.
 
 Every push runs **Personal Integration**: the existing full CI workflow, macOS
 arm64 and Windows x64 desktop builds, and standalone daemon/CLI packages
