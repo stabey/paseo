@@ -86,20 +86,14 @@ feature remains traceable. Update this branch by merging a freshly fetched
 `origin/main`; push it to `fork`, which points to `stabey/paseo`.
 
 Every push runs **Personal Integration**: the existing full CI workflow, macOS
-arm64 and Windows x64/arm64 desktop builds, and standalone daemon/CLI packages
+arm64 and Windows x64 desktop builds, and standalone daemon/CLI packages
 with the browser UI. Each desktop architecture builds on a matching native runner
 and runs the packaged smoke test, including the renderer, bundled daemon, and CLI.
-Windows artifacts contain an NSIS `.exe` installer and a `.zip` for each architecture;
-choose x64 for Intel/AMD PCs or arm64 for Windows on Arm. Builds run alongside the
+Windows artifacts contain an NSIS `.exe` installer and a `.zip` for Intel/AMD PCs.
+Builds run alongside the
 checks; install artifacts only from a successful workflow run. Actions retains the
 packages for 30 days. Each archive includes the source commit in `build-info.json`
 and package hashes in `SHA256SUMS`.
-
-On Windows ARM64, the locked Cloudflare `workerd` installer rejects the platform.
-CI replays required dependency scripts and repository patches, excluding that
-unused deployment tool. Optional native accelerators keep their JavaScript
-fallbacks; rebuilding them would turn an optional compiler failure into a failed
-installation. Required native modules still install and pass the packaged smoke test.
 
 All packages receive the same `-stabey.<run number>` version in the build
 checkout, including their internal dependency ranges. The version sync's
