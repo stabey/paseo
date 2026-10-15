@@ -63,6 +63,29 @@ export async function verifyStartupFailureRecovery({
     await desktop.close();
     desktop = null;
   }
+  async function seedHostProfileForNextLaunch(profile) {
+    // Unmount the host runtime before replacing its persisted state. Connection
+    // updates can otherwise save the live registry over this startup fixture.
+    const fixtureUrl = new URL("/__paseo_storage_fixture", page.url()).href;
+    await page.route(
+      fixtureUrl,
+      (route) =>
+        route.fulfill({
+          contentType: "text/html",
+          body: "<!doctype html><title>Storage fixture</title>",
+        }),
+      { times: 1 },
+    );
+    await page.goto(fixtureUrl);
+    await page.evaluate((savedProfile) => {
+      localStorage.setItem("@paseo:daemon-registry", JSON.stringify([savedProfile]));
+    }, profile);
+    await desktop.evaluate(({ session }) => session.defaultSession.flushStorageData());
+    assert.deepEqual(
+      await page.evaluate(() => JSON.parse(localStorage.getItem("@paseo:daemon-registry"))),
+      [profile],
+    );
+  }
   async function expectExternalDaemonAlive() {
     assert.equal((await readDaemonInstance(home)).pid, instance.pid);
     process.kill(instance.pid, 0);
@@ -150,9 +173,7 @@ export async function verifyStartupFailureRecovery({
         },
       ],
     };
-    await page.evaluate((profile) => {
-      localStorage.setItem("@paseo:daemon-registry", JSON.stringify([profile]));
-    }, previousProfile);
+    await seedHostProfileForNextLaunch(previousProfile);
     await closeDesktop();
     await openDesktop();
     await expect
@@ -272,9 +293,7 @@ export async function verifyStartupFailureRecovery({
     );
     await assert.rejects(readFile(path.join(desktopHome, "daemon.log")), { code: "ENOENT" });
     await page.screenshot({ path: path.join(root, "reuse-existing-password.png") });
-    await page.evaluate((profile) => {
-      localStorage.setItem("@paseo:daemon-registry", JSON.stringify([profile]));
-    }, externalProfile);
+    await seedHostProfileForNextLaunch(externalProfile);
     await closeDesktop();
     await openDesktop();
     await expect(page.getByTestId("add-host-modal")).toBeVisible({ timeout: 30_000 });
@@ -298,9 +317,7 @@ export async function verifyStartupFailureRecovery({
       connections: [offlineConnection],
       preferredConnectionId: offlineConnection.id,
     };
-    await page.evaluate((profile) => {
-      localStorage.setItem("@paseo:daemon-registry", JSON.stringify([profile]));
-    }, offlineProfile);
+    await seedHostProfileForNextLaunch(offlineProfile);
     await closeDesktop();
     await openDesktop();
     await expect(page.getByTestId("add-host-modal")).toBeVisible({ timeout: 30_000 });
