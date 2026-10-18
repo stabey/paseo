@@ -41,6 +41,10 @@ export function addProjectFlowHost(page: Page, serverId: string): Locator {
   return page.getByTestId(`add-project-flow-host-${serverId}`);
 }
 
+export function addProjectFlowDirectory(page: Page, directoryPath: string): Locator {
+  return page.getByTestId(`add-project-flow-path-${encodeURIComponent(directoryPath)}`);
+}
+
 export function addProjectFlowMethod(page: Page, method: AddProjectMethod): Locator {
   return page.getByTestId(`add-project-flow-method-${method}`);
 }
@@ -107,12 +111,8 @@ export async function navigateAddProjectResults(
   for (let index = 0; index < count; index += 1) await page.keyboard.press(key);
 }
 
-export async function expectAddProjectResultVisible(
-  page: Page,
-  directoryPath: string,
-): Promise<void> {
+export async function expectAddProjectResultVisible(page: Page, row: Locator): Promise<void> {
   const results = page.getByTestId("add-project-flow-results");
-  const row = results.getByTestId(`add-project-flow-path-${encodeURIComponent(directoryPath)}`);
   await expect
     .poll(async () => {
       const viewport = await results.boundingBox();
