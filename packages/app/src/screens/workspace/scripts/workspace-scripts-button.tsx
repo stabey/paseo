@@ -332,7 +332,7 @@ function ScriptRow({
   const liveTerminalId =
     script.terminalId && liveTerminalIdSet.has(script.terminalId) ? script.terminalId : null;
   const showExitBadge = !isRunning && exitCode !== null;
-  const { start, stop, restart } = actions;
+  const { start, stop, restart, copyUrl } = actions;
   const closeMenu = useDropdownMenuClose();
 
   const handleOpenService = useCallback(() => {
@@ -348,9 +348,9 @@ function ScriptRow({
   const handleCopyService = useCallback(
     (target: WorkspaceScriptLinkTarget) => {
       if (target.kind === "forwarded" && script.port) onForwardService?.(script.port, "copy");
-      else actions.copyUrl(target);
+      else copyUrl(target);
     },
-    [script.port, onForwardService, actions.copyUrl],
+    [script.port, onForwardService, copyUrl],
   );
 
   const handleView = useCallback(() => {

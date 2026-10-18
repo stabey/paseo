@@ -21,17 +21,27 @@ const {
   routePreferenceByServerIdMock,
   routePreferenceListenersMock,
   setPreferredRouteMock,
+  desktopRuntimeMock,
+  forwardingCapabilityMock,
+  startForwardMock,
+  openExternalUrlMock,
 } = await vi.hoisted(async () => {
   const { theme: hoistedTheme } = await import("@/styles/theme");
 
-  const routePreferenceByServerId: Record<string, "public" | "paseo" | "direct"> = {};
+  const routePreferenceByServerId: Record<string, "public" | "paseo" | "direct" | "forwarded"> = {};
   const routePreferenceListeners = new Set<() => void>();
-  const setPreferredRoute = vi.fn((serverId: string, kind: "public" | "paseo" | "direct") => {
-    routePreferenceByServerId[serverId] = kind;
-    for (const listener of routePreferenceListeners) listener();
-  });
+  const setPreferredRoute = vi.fn(
+    (serverId: string, kind: "public" | "paseo" | "direct" | "forwarded") => {
+      routePreferenceByServerId[serverId] = kind;
+      for (const listener of routePreferenceListeners) listener();
+    },
+  );
 
   return {
+    desktopRuntimeMock: vi.fn(() => false),
+    forwardingCapabilityMock: vi.fn(() => false),
+    startForwardMock: vi.fn(async () => ({ localPort: 58432 })),
+    openExternalUrlMock: vi.fn(),
     theme: hoistedTheme,
     startWorkspaceScriptMock: vi.fn(async () => ({ terminalId: "terminal-script-1" })),
     killTerminalMock: vi.fn(async () => ({
@@ -101,6 +111,7 @@ vi.mock("@/stores/session-store", () => ({
     selector({
       sessions: {
         "test-server": {
+          serverInfo: { features: { workspacePortForwarding: forwardingCapabilityMock() } },
           client: {
             startWorkspaceScript: startWorkspaceScriptMock,
             killTerminal: killTerminalMock,
@@ -119,7 +130,16 @@ vi.mock("expo-clipboard", () => ({
 }));
 
 vi.mock("@/utils/open-external-url", () => ({
-  openExternalUrl: vi.fn(),
+  openExternalUrl: openExternalUrlMock,
+}));
+
+vi.mock("@/desktop/host", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/desktop/host")>()),
+  isElectronRuntime: desktopRuntimeMock,
+}));
+
+vi.mock("@/port-forwarding/desktop", () => ({
+  getPortForwarding: () => ({ start: startForwardMock }),
 }));
 
 vi.mock("@/components/ui/dropdown-menu", () => ({
@@ -306,6 +326,10 @@ describe("WorkspaceScriptsButton", () => {
     setStringAsyncMock.mockClear();
     copiedToastMock.mockClear();
     setPreferredRouteMock.mockClear();
+    desktopRuntimeMock.mockReturnValue(false);
+    forwardingCapabilityMock.mockReturnValue(false);
+    startForwardMock.mockClear();
+    openExternalUrlMock.mockClear();
     for (const serverId of Object.keys(routePreferenceByServerIdMock)) {
       delete routePreferenceByServerIdMock[serverId];
     }
@@ -453,6 +477,50 @@ describe("WorkspaceScriptsButton", () => {
     current.unmount();
     current = renderScripts(scripts);
     expect(requireRow("dev").textContent).toContain("localhost:57483");
+  });
+
+  it("opens and copies a forwarded service using the allocated local port", async () => {
+    desktopRuntimeMock.mockReturnValue(true);
+    forwardingCapabilityMock.mockReturnValue(true);
+    current = renderScripts([
+      script({ scriptName: "dev", type: "service", lifecycle: "running", port: 3000 }),
+    ]);
+    const row = requireRow("dev");
+    expect(row.textContent).toContain(testI18n.t("workspace.ports.thisDevice"));
+
+    await act(async () => {
+      fireEvent.click(
+        row.querySelector('[data-testid="workspace-scripts-open-dev"]') as HTMLElement,
+      );
+    });
+    expect(startForwardMock).toHaveBeenCalledWith({ workspaceId: "workspace-1", port: 3000 });
+    expect(openExternalUrlMock).toHaveBeenCalledWith("http://127.0.0.1:58432");
+
+    await act(async () => {
+      fireEvent.click(
+        row.querySelector('[data-testid="workspace-scripts-copy-dev"]') as HTMLElement,
+      );
+    });
+    expect(setStringAsyncMock).toHaveBeenCalledWith("http://127.0.0.1:58432");
+    expect(setStringAsyncMock).not.toHaveBeenCalledWith("");
+    expect(copiedToastMock).toHaveBeenCalledWith("http://127.0.0.1:58432");
+  });
+
+  it.each([
+    { desktop: false, supported: true },
+    { desktop: true, supported: false },
+  ])("hides forwarded routes when unavailable: %j", ({ desktop, supported }) => {
+    desktopRuntimeMock.mockReturnValue(desktop);
+    forwardingCapabilityMock.mockReturnValue(supported);
+    routePreferenceByServerIdMock["test-server"] = "forwarded";
+    current = renderScripts([
+      script({ scriptName: "dev", type: "service", lifecycle: "running", port: 3000 }),
+    ]);
+    const row = requireRow("dev");
+    expect(row.textContent).not.toContain(testI18n.t("workspace.ports.thisDevice"));
+    fireEvent.click(row.querySelector('[data-testid="workspace-scripts-copy-dev"]') as HTMLElement);
+    expect(setStringAsyncMock).toHaveBeenCalledWith("http://localhost:3000");
+    expect(startForwardMock).not.toHaveBeenCalled();
   });
 
   it("defaults to a configured reverse proxy URL", () => {
