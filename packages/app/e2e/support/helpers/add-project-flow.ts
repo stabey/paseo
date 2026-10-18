@@ -107,9 +107,12 @@ export async function navigateAddProjectResults(
   for (let index = 0; index < count; index += 1) await page.keyboard.press(key);
 }
 
-export async function expectAddProjectResultVisible(page: Page, text: string): Promise<void> {
+export async function expectAddProjectResultVisible(
+  page: Page,
+  directoryPath: string,
+): Promise<void> {
   const results = page.getByTestId("add-project-flow-results");
-  const row = results.getByRole("button").filter({ has: page.getByText(text, { exact: true }) });
+  const row = results.getByTestId(`add-project-flow-path-${encodeURIComponent(directoryPath)}`);
   await expect
     .poll(async () => {
       const viewport = await results.boundingBox();
