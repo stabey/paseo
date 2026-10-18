@@ -8,6 +8,7 @@ import {
   addProjectFlow,
   addProjectFlowBack,
   addProjectFlowConfirmDirectory,
+  addProjectFlowDirectory,
   addProjectFlowHost,
   addProjectFlowInput,
   addProjectFlowMethod,
@@ -292,21 +293,21 @@ test.describe("Add Project command-center flow", () => {
       await addProjectFlowInput(page).fill("Fleet");
       await expect(addProjectFlowHost(page, hosts[2]!.serverId)).toHaveCount(0);
       await navigateAddProjectResults(page, "ArrowDown", 2);
-      await expectAddProjectResultVisible(page, "Fleet 02");
+      await expectAddProjectResultVisible(page, addProjectFlowHost(page, hosts[1]!.serverId));
 
       // Filtering out the first host moves retained rows to new positions.
       await addProjectFlowInput(page).fill("scroll-host");
       await expect(addProjectFlowHost(page, getServerId())).toHaveCount(0);
-      await expectAddProjectResultVisible(page, "Fleet 01");
+      await expectAddProjectResultVisible(page, addProjectFlowHost(page, hosts[0]!.serverId));
       await navigateAddProjectResults(page, "ArrowDown", 2);
-      await expectAddProjectResultVisible(page, "Other host");
+      await expectAddProjectResultVisible(page, addProjectFlowHost(page, hosts[2]!.serverId));
       await navigateAddProjectResults(page, "ArrowDown", 1);
-      await expectAddProjectResultVisible(page, "Fleet 01");
+      await expectAddProjectResultVisible(page, addProjectFlowHost(page, hosts[0]!.serverId));
 
       await addProjectFlowInput(page).fill("Fleet");
-      await expectAddProjectResultVisible(page, "Fleet 00");
+      await expectAddProjectResultVisible(page, addProjectFlowHost(page, getServerId()));
       await navigateAddProjectResults(page, "ArrowDown", 2);
-      await expectAddProjectResultVisible(page, "Fleet 02");
+      await expectAddProjectResultVisible(page, addProjectFlowHost(page, hosts[1]!.serverId));
       await page.keyboard.press("Enter");
       await expectAddProjectPage(page, "method");
       await expect(addProjectFlow(page)).toContainText("Fleet 02");
@@ -366,26 +367,26 @@ test.describe("Add Project command-center flow", () => {
       });
 
       await navigateAddProjectResults(page, "ArrowDown", 12);
-      await expectAddProjectResultVisible(page, rowPath(11));
+      await expectAddProjectResultVisible(page, addProjectFlowDirectory(page, rowPath(11)));
       await navigateAddProjectResults(page, "ArrowUp", 12);
-      await expectAddProjectResultVisible(page, parentDirectory);
+      await expectAddProjectResultVisible(page, addProjectFlowDirectory(page, parentDirectory));
       await navigateAddProjectResults(page, "ArrowUp", 1);
-      await expectAddProjectResultVisible(page, rowPath(15));
+      await expectAddProjectResultVisible(page, addProjectFlowDirectory(page, rowPath(15)));
       await navigateAddProjectResults(page, "ArrowDown", 1);
-      await expectAddProjectResultVisible(page, parentDirectory);
+      await expectAddProjectResultVisible(page, addProjectFlowDirectory(page, parentDirectory));
 
       await navigateAddProjectResults(page, "ArrowDown", 12);
-      await expectAddProjectResultVisible(page, rowPath(11));
+      await expectAddProjectResultVisible(page, addProjectFlowDirectory(page, rowPath(11)));
       await addProjectFlowInput(page).fill(`${path.basename(parentDirectory)}probe`);
       await expect(results.getByRole("button")).toHaveCount(16);
-      await expectAddProjectResultVisible(page, rowPath(0));
+      await expectAddProjectResultVisible(page, addProjectFlowDirectory(page, rowPath(0)));
       await navigateAddProjectResults(page, "ArrowDown", 12);
-      await expectAddProjectResultVisible(page, rowPath(12));
+      await expectAddProjectResultVisible(page, addProjectFlowDirectory(page, rowPath(12)));
       await addProjectFlowInput(page).fill(path.basename(parentDirectory));
       await expect(results.getByRole("button")).toHaveCount(17);
-      await expectAddProjectResultVisible(page, parentDirectory);
+      await expectAddProjectResultVisible(page, addProjectFlowDirectory(page, parentDirectory));
       await navigateAddProjectResults(page, "ArrowDown", 12);
-      await expectAddProjectResultVisible(page, rowPath(11));
+      await expectAddProjectResultVisible(page, addProjectFlowDirectory(page, rowPath(11)));
       await page.keyboard.press("Enter");
       await expect(addProjectFlowInput(page)).toHaveValue(`${rowPath(11)}${path.sep}`);
       await addProjectFlowConfirmDirectory(page).click();
