@@ -122,6 +122,21 @@ describe("daemon relay config", () => {
     expect(loadConfig(hostedHome, { env: {} }).relayUseTls).toBe(true);
   });
 
+  test("resolves the relay proxy against the configured relay endpoint", async () => {
+    const home = await createPaseoHome({
+      version: 1,
+      daemon: { relay: { enabled: true, endpoint: "relay.corp.test:443", useTls: true } },
+    });
+    expect(
+      loadConfig(home, { env: { HTTPS_PROXY: "http://proxy.corp.test:8080" } }).relayProxy,
+    ).toEqual({ url: "http://proxy.corp.test:8080/", source: "environment" });
+    expect(
+      loadConfig(home, {
+        env: { HTTPS_PROXY: "http://proxy.corp.test:8080", NO_PROXY: ".corp.test" },
+      }).relayProxy,
+    ).toBeNull();
+  });
+
   test("relayPublicUseTls falls back to relayUseTls when unset", async () => {
     const home = await createPaseoHome({ version: 1, daemon: { relay: {} } });
     // Default: both true (hosted relay)

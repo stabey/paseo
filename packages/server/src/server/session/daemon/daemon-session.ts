@@ -12,6 +12,7 @@ import type { ManagedAgent } from "../../agent/agent-manager.js";
 import type { PersistedProjectRecord, PersistedWorkspaceRecord } from "../../workspace-registry.js";
 import type { HubRelationshipManagement } from "../../hub/relationship-controller.js";
 import type { DaemonConfigReloadResult } from "../../daemon-config-store.js";
+import type { RelayProxySelection } from "../../relay-proxy.js";
 
 export interface DaemonRuntimeConfig {
   listen: string | null;
@@ -25,6 +26,7 @@ export interface DaemonRuntimeConfig {
     useTls: boolean;
     publicUseTls: boolean;
   } | null;
+  getRelayProxy?(): RelayProxySelection | null;
 }
 
 export interface DaemonSessionHost {

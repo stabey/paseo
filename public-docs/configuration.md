@@ -267,6 +267,12 @@ Set the persisted value in `config.json`:
 
 `PASEO_RELAY_ENABLED=true|false` overrides the file for a foreground deployment. Managed `start` uses the file. End and relaunch a deployment to remove its override before changing relay from the app or `paseo daemon pair --relay`.
 
+### Relay through a proxy
+
+The daemon connects to the relay through an HTTP CONNECT proxy when one is configured. Paseo Desktop resolves the system proxy settings, including PAC and WPAD, for the relay URL each time it starts its daemon. Other daemons read `HTTPS_PROXY` (`HTTP_PROXY` for a relay without TLS) or `ALL_PROXY`, and skip the proxy when `NO_PROXY` matches the relay host. `PASEO_RELAY_PROXY` overrides both; set it to `direct` to connect without a proxy. SOCKS proxies are not supported.
+
+Relay TLS also trusts certificates in the operating system store, so a gateway that re-signs HTTPS with a corporate root works once that root is installed on the machine. The active proxy appears under **Relay proxy** in the host's full status.
+
 ## Common env vars
 
 - `PASEO_HOME`, set Paseo home directory
@@ -274,6 +280,7 @@ Set the persisted value in `config.json`:
 - `PASEO_PASSWORD`, on the daemon, the password to require (plaintext, hashed at startup); on the CLI, the password used to connect when the host URI doesn't include one
 - `PASEO_LISTEN`, override `daemon.listen`
 - `PASEO_RELAY_ENABLED`, enable or disable the outbound relay for this daemon launch
+- `PASEO_RELAY_PROXY`, HTTP proxy for relay connections, or `direct`; see [Relay through a proxy](#relay-through-a-proxy)
 - `PASEO_HOSTNAMES`, override/extend `daemon.hostnames`
 - `PASEO_ALLOWED_HOSTS`, deprecated alias for `PASEO_HOSTNAMES`
 - `PASEO_WEB_UI_ENABLED`, enable or disable the daemon-served web UI

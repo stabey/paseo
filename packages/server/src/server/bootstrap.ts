@@ -172,6 +172,7 @@ import { createConfiguredTerminalManager } from "../terminal/terminal-manager-fa
 import { applyTerminalAgentHookSetting } from "../terminal/agent-hooks/terminal-agent-hook-setting.js";
 import { loadOrCreateDaemonKeyPair } from "./daemon-keypair.js";
 import { createRelayRuntime, type RelayRuntime } from "./relay-runtime.js";
+import type { RelayProxySelection } from "./relay-proxy.js";
 import type { PushNotificationSender } from "./push/index.js";
 import { getOrCreateServerId } from "./server-id.js";
 import { resolveDaemonVersion } from "./daemon-version.js";
@@ -428,6 +429,7 @@ export interface PaseoDaemonConfig {
   relayPublicEndpoint?: string;
   relayUseTls?: boolean;
   relayPublicUseTls?: boolean;
+  relayProxy?: RelayProxySelection | null;
   serviceProxy?: {
     publicBaseUrl: string | null;
     standaloneListen: string | null;
@@ -1755,6 +1757,7 @@ export async function createPaseoDaemon(
                     useTls: relayUseTls,
                     publicUseTls: relayPublicUseTls,
                   },
+                getRelayProxy: () => config.relayProxy ?? null,
               },
               serviceProxyPublicBaseUrl,
               browserToolsBroker,
@@ -1783,6 +1786,7 @@ export async function createPaseoDaemon(
               },
               serverId,
               daemonKeyPair: daemonKeyPair.keyPair,
+              proxy: config.relayProxy ?? null,
             });
             daemonConfigStore.onFieldChange("relay.enabled", (value) => {
               relayRuntime?.setEnabled(value === true);

@@ -37,6 +37,7 @@ vi.mock("electron", () => ({
   },
   ipcMain: { handle: vi.fn() },
   powerMonitor: { getSystemIdleTime: vi.fn(() => 0) },
+  session: { defaultSession: { resolveProxy: vi.fn(async () => "DIRECT") } },
 }));
 
 vi.mock("electron-log/main", () => ({

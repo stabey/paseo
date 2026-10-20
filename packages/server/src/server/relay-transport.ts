@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 import { EventEmitter } from "node:events";
-import { WebSocket } from "ws";
+import { HttpsProxyAgent } from "https-proxy-agent";
+import { WebSocket, type ClientOptions } from "ws";
 import type pino from "pino";
 import {
   createDaemonChannel,
@@ -10,6 +11,11 @@ import {
 import { buildRelayWebSocketUrl } from "@getpaseo/protocol/daemon-endpoints";
 import type { ExternalSocketMetadata } from "./websocket-server.js";
 import { createEncryptedRelaySocket } from "./websocket/encrypted-relay-socket.js";
+import {
+  redactProxyUrl,
+  resolveRelayCertificateAuthorities,
+  type RelayProxySelection,
+} from "./relay-proxy.js";
 
 export interface RelayTransportOptions {
   logger: pino.Logger;
@@ -18,6 +24,7 @@ export interface RelayTransportOptions {
   relayUseTls: boolean;
   serverId: string;
   daemonKeyPair?: KeyPair;
+  proxy?: RelayProxySelection | null;
   createWebSocket?: RelayWebSocketFactory;
 }
 
@@ -64,8 +71,16 @@ const RELAY_WEBSOCKET_OPTIONS = {
   autoSelectFamilyAttemptTimeout: 5_000,
 } as const;
 
-function createDefaultRelayWebSocket(url: string): RelayWebSocketLike {
-  return new WebSocket(url, RELAY_WEBSOCKET_OPTIONS);
+function createDefaultRelayWebSocketFactory(
+  proxy: RelayProxySelection | null,
+): RelayWebSocketFactory {
+  const options: ClientOptions = { ...RELAY_WEBSOCKET_OPTIONS };
+  const ca = resolveRelayCertificateAuthorities();
+  if (ca) options.ca = ca;
+  if (proxy) options.agent = new HttpsProxyAgent(proxy.url, ca ? { ca } : {});
+  return function createRelayWebSocket(url) {
+    return new WebSocket(url, options);
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -119,9 +134,16 @@ export function startRelayTransport({
   relayUseTls,
   serverId,
   daemonKeyPair,
-  createWebSocket = createDefaultRelayWebSocket,
+  proxy = null,
+  createWebSocket = createDefaultRelayWebSocketFactory(proxy),
 }: RelayTransportOptions): RelayTransportController {
   const relayLogger = logger.child({ module: "relay-transport" });
+  if (proxy) {
+    relayLogger.info(
+      { proxy: redactProxyUrl(proxy.url), source: proxy.source },
+      "relay_proxy_configured",
+    );
+  }
 
   let stopped = false;
   let controlWs: RelayWebSocketLike | null = null;
