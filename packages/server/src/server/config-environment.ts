@@ -65,6 +65,17 @@ const CONFIG_CONTEXT_ENV_KEYS = [
   "OPENAI_BASE_URL",
   "OPENAI_STT_API_KEY",
   "OPENAI_TTS_API_KEY",
+  // Relay proxy selection (see relay-proxy.ts). Kept out of DAEMON_SETTING_ENV_KEYS so
+  // managed launches keep the desktop-resolved system proxy and the user's own variables.
+  "PASEO_RELAY_PROXY",
+  "HTTPS_PROXY",
+  "https_proxy",
+  "HTTP_PROXY",
+  "http_proxy",
+  "ALL_PROXY",
+  "all_proxy",
+  "NO_PROXY",
+  "no_proxy",
 ] as const;
 
 export function configurationEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {

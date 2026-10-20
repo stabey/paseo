@@ -9,6 +9,7 @@ import type { WebSocketRuntimeDiagnosticSnapshot } from "../../websocket/runtime
 import type { PersistedProjectRecord, PersistedWorkspaceRecord } from "../../workspace-registry.js";
 import { execCommand } from "../../../utils/spawn.js";
 import type { DaemonRuntimeConfig } from "./daemon-session.js";
+import { redactProxyUrl } from "../../relay-proxy.js";
 
 interface DiagnosticEntry {
   label: string;
@@ -152,7 +153,14 @@ function collectRuntimeConfigEntries(options: DaemonDiagnosticsOptions): Diagnos
     { label: "Relay public endpoint configured", value: relay?.publicEndpoint ? "true" : "false" },
     { label: "Relay TLS", value: relay ? String(relay.useTls) : "n/a" },
     { label: "Relay public TLS", value: relay ? String(relay.publicUseTls) : "n/a" },
+    { label: "Relay proxy", value: formatRelayProxy(options) },
   ];
+}
+
+function formatRelayProxy(options: DaemonDiagnosticsOptions): string {
+  const proxy = options.daemonRuntimeConfig?.getRelayProxy?.() ?? null;
+  if (!proxy) return "direct";
+  return `${redactProxyUrl(proxy.url)} (${proxy.source})`;
 }
 
 function collectSystemEntries(): DiagnosticEntry[] {

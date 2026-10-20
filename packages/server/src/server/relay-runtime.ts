@@ -6,6 +6,7 @@ import {
   type RelaySocketLike,
   type RelayTransportController,
 } from "./relay-transport.js";
+import type { RelayProxySelection } from "./relay-proxy.js";
 
 export interface RelayRuntimeConfig {
   enabled: boolean;
@@ -21,6 +22,7 @@ interface RelayRuntimeOptions {
   attachSocket(ws: RelaySocketLike, metadata?: ExternalSocketMetadata): Promise<void>;
   serverId: string;
   daemonKeyPair: KeyPair;
+  proxy?: RelayProxySelection | null;
   startTransport?: typeof startRelayTransport;
 }
 
@@ -44,6 +46,7 @@ export function createRelayRuntime(options: RelayRuntimeOptions): RelayRuntime {
       relayUseTls: config.useTls,
       serverId: options.serverId,
       daemonKeyPair: options.daemonKeyPair,
+      proxy: options.proxy ?? null,
     });
   }
 

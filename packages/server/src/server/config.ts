@@ -25,6 +25,7 @@ import { resolveSpeechConfig } from "./speech/speech-config-resolver.js";
 import type { RequestedSpeechProviders } from "./speech/speech-types.js";
 import { mergeHostnames, parseHostnamesEnv, type HostnamesConfig } from "./hostnames.js";
 import { resolveGitProcessPolicy } from "../utils/git-process-scheduler.js";
+import { resolveRelayProxy, type RelayProxySelection } from "./relay-proxy.js";
 
 export {
   loadPersistedConfig,
@@ -279,6 +280,7 @@ interface ResolvedRelay {
   publicEndpoint: string;
   useTls: boolean;
   publicUseTls: boolean;
+  proxy: RelayProxySelection | null;
 }
 
 interface ResolvedServiceProxy {
@@ -333,6 +335,7 @@ function resolveRelayConfig(input: ResolveRelayInput): ResolvedRelay {
     publicEndpoint,
     useTls,
     publicUseTls,
+    proxy: resolveRelayProxy({ env: input.env, endpoint, useTls }),
   };
 }
 
@@ -640,6 +643,7 @@ export function resolveConfigFromPersisted(
     relayPublicEndpoint: relay.publicEndpoint,
     relayUseTls: relay.useTls,
     relayPublicUseTls: relay.publicUseTls,
+    relayProxy: relay.proxy,
     serviceProxy,
     webUi,
     appBaseUrl,

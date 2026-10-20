@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { invokePortForwarding } from "./port-forwarding-ipc.js";
 import path from "node:path";
-import { app, ipcMain, powerMonitor } from "electron";
+import { app, ipcMain, powerMonitor, session } from "electron";
 import log from "electron-log/main";
 import {
   resolvePaseoHome,
@@ -55,6 +55,7 @@ import {
 } from "../integrations/legacy-skill-selection.js";
 import { tailFile } from "../diagnostics/tail-file.js";
 import { getLocalDaemonCandidates } from "./local-daemon-candidates.js";
+import { resolveDesktopRelayProxyEnv } from "./relay-proxy-env.js";
 
 const DAEMON_LOG_FILENAME = "daemon.log";
 let ownedLaunch: { home: string; instance: DaemonInstance } | null = null;
@@ -309,12 +310,22 @@ async function startDaemon(): Promise<DesktopDaemonStatus> {
     args: [],
     baseEnv: process.env,
   });
+  const relayProxy = await resolveDesktopRelayProxyEnv({
+    home,
+    env: process.env,
+    resolveProxy: (url) => session.defaultSession.resolveProxy(url),
+  });
+  logDesktopDaemonLifecycle("resolved system proxy for relay", {
+    relayUrl: relayProxy.relayUrl,
+    proxyList: relayProxy.proxyList,
+    error: relayProxy.error,
+  });
   try {
     await startDaemonInstance({
       home,
       timeoutMs: 30_000,
       ...invocation,
-      env: { ...invocation.env, PASEO_CLI: getBundledCliShimPath() },
+      env: { ...invocation.env, ...relayProxy.env, PASEO_CLI: getBundledCliShimPath() },
       mode: "managed",
       desktopManaged: true,
       onAcquired: (instance) => {

@@ -1,5 +1,8 @@
+import { createServer, type Server } from "node:http";
+import { connect, type AddressInfo, type Socket } from "node:net";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import pino from "pino";
+import { WebSocketServer } from "ws";
 import { createClientChannel, type Transport } from "@getpaseo/relay/e2ee";
 import { exportPublicKey, generateKeyPair } from "@getpaseo/relay";
 import { startRelayTransport } from "./relay-transport";
@@ -379,5 +382,106 @@ describe("relay-transport control lifecycle", () => {
 
     expect(relay.sockets[0]?.url).toMatch(/^wss:\/\/\[::1\]\/ws\?/);
     expect(relay.sockets[1]?.url).toMatch(/^wss:\/\/\[::1\]\/ws\?/);
+  });
+});
+
+interface TestServer {
+  port: number;
+  close: () => Promise<void>;
+}
+
+function listenOnLoopback(server: Server, sockets: Set<Socket>): Promise<TestServer> {
+  server.on("connection", (socket) => sockets.add(socket));
+  return new Promise((resolve) => {
+    server.listen(0, "127.0.0.1", () => {
+      resolve({
+        port: (server.address() as AddressInfo).port,
+        close: () => closeServer(server, sockets),
+      });
+    });
+  });
+}
+
+function closeServer(server: Server, sockets: Set<Socket>): Promise<void> {
+  for (const socket of sockets) socket.destroy();
+  return new Promise((resolve) => server.close(() => resolve()));
+}
+
+async function startRelayServer(requests: string[]): Promise<TestServer> {
+  const server = createServer();
+  const wss = new WebSocketServer({ server });
+  wss.on("connection", (ws, request) => {
+    requests.push(request.url ?? "");
+    ws.send(JSON.stringify({ type: "sync", connectionIds: [] }));
+  });
+  const listening = await listenOnLoopback(server, new Set());
+  return {
+    port: listening.port,
+    close: async () => {
+      for (const client of wss.clients) client.terminate();
+      await new Promise<void>((resolve) => wss.close(() => resolve()));
+      await listening.close();
+    },
+  };
+}
+
+function tunnel(clientSocket: Socket, target: string, head: Buffer, sockets: Set<Socket>): void {
+  const [host, port] = target.split(":");
+  const upstream = connect(Number(port), host, () => {
+    clientSocket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+    if (head.length > 0) upstream.write(head);
+    upstream.pipe(clientSocket);
+    clientSocket.pipe(upstream);
+  });
+  sockets.add(upstream);
+  upstream.on("error", () => clientSocket.destroy());
+  clientSocket.on("error", () => upstream.destroy());
+}
+
+async function startConnectProxy(targets: string[]): Promise<TestServer> {
+  const server = createServer();
+  const sockets = new Set<Socket>();
+  server.on("connect", (request, clientSocket: Socket, head: Buffer) => {
+    targets.push(request.url ?? "");
+    tunnel(clientSocket, request.url ?? "", head, sockets);
+  });
+  return listenOnLoopback(server, sockets);
+}
+
+describe("relay-transport proxy", () => {
+  const cleanups: Array<() => Promise<void>> = [];
+
+  afterEach(async () => {
+    for (const cleanup of cleanups.toReversed()) await cleanup();
+    cleanups.length = 0;
+  });
+
+  test("tunnels the control socket through an HTTP CONNECT proxy", async () => {
+    const relayRequests: string[] = [];
+    const relay = await startRelayServer(relayRequests);
+    cleanups.push(relay.close);
+    const connectTargets: string[] = [];
+    const proxy = await startConnectProxy(connectTargets);
+    cleanups.push(proxy.close);
+
+    const logger = createMockLogger();
+    const controller = startRelayTransport({
+      logger: logger as unknown as pino.Logger,
+      attachSocket: async () => {},
+      relayEndpoint: `127.0.0.1:${relay.port}`,
+      relayUseTls: false,
+      serverId: "srv_proxy_test",
+      proxy: { url: `http://127.0.0.1:${proxy.port}`, source: "PASEO_RELAY_PROXY" },
+    });
+    cleanups.push(() => controller.stop());
+
+    await vi.waitFor(() => {
+      expect(hasLogMessage(logger, "info", "relay_control_connected")).toBe(true);
+    });
+    expect(connectTargets).toEqual([`127.0.0.1:${relay.port}`]);
+    expect(relayRequests).toHaveLength(1);
+    expect(relayRequests[0]).toContain("serverId=srv_proxy_test");
+    expect(relayRequests[0]).toContain("role=server");
+    expect(hasLogMessage(logger, "info", "relay_proxy_configured")).toBe(true);
   });
 });
