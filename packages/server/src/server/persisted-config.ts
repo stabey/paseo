@@ -15,6 +15,7 @@ import { AgentProfileSchema, AgentSkillSelectionSchema } from "@getpaseo/protoco
 import { PluginIdSchema, PluginSourceSchema } from "@getpaseo/protocol/plugin-config";
 import { TerminalProfileSchema } from "@getpaseo/protocol/terminal-profile";
 import { PaseoServicePortAllocationSchema } from "@getpaseo/protocol/paseo-config-schema";
+import { RelayGatewayConfigSchema, RelayGatewayTokenSchema } from "./relay-gateway-config.js";
 
 export const LogLevelSchema = z.enum(["trace", "debug", "info", "warn", "error", "fatal"]);
 export const LogFormatSchema = z.enum(["pretty", "json"]);
@@ -283,9 +284,11 @@ export const PersistedConfigSchema = z
             publicEndpoint: z.string().optional(),
             useTls: z.boolean().optional(),
             publicUseTls: z.boolean().optional(),
+            gatewayToken: RelayGatewayTokenSchema.optional(),
           })
           .strict()
           .optional(),
+        relayGateway: RelayGatewayConfigSchema.optional(),
         serviceProxy: z
           .object({
             // COMPAT(serviceProxyEnabled): added 2026-06-02, remove after 2026-12-02.

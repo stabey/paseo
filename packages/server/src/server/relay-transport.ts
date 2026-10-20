@@ -1,7 +1,6 @@
 /// <reference lib="dom" />
 import { EventEmitter } from "node:events";
-import { HttpsProxyAgent } from "https-proxy-agent";
-import { WebSocket, type ClientOptions } from "ws";
+import { WebSocket } from "ws";
 import type pino from "pino";
 import {
   createDaemonChannel,
@@ -11,11 +10,8 @@ import {
 import { buildRelayWebSocketUrl } from "@getpaseo/protocol/daemon-endpoints";
 import type { ExternalSocketMetadata } from "./websocket-server.js";
 import { createEncryptedRelaySocket } from "./websocket/encrypted-relay-socket.js";
-import {
-  redactProxyUrl,
-  resolveRelayCertificateAuthorities,
-  type RelayProxySelection,
-} from "./relay-proxy.js";
+import { redactProxyUrl, type RelayProxySelection } from "./relay-proxy.js";
+import { createRelayWebSocketFactory } from "./relay-websocket.js";
 
 export interface RelayTransportOptions {
   logger: pino.Logger;
@@ -25,6 +21,7 @@ export interface RelayTransportOptions {
   serverId: string;
   daemonKeyPair?: KeyPair;
   proxy?: RelayProxySelection | null;
+  gatewayToken?: string;
   createWebSocket?: RelayWebSocketFactory;
 }
 
@@ -63,19 +60,6 @@ type ControlMessage =
 const CONTROL_PING_INTERVAL_MS = 10_000;
 const CONTROL_STALE_TIMEOUT_MS = 30_000;
 const CONTROL_READY_TIMEOUT_MS = 8_000;
-const RELAY_WEBSOCKET_OPTIONS = { handshakeTimeout: 10_000, perMessageDeflate: false } as const;
-
-function createDefaultRelayWebSocketFactory(
-  proxy: RelayProxySelection | null,
-): RelayWebSocketFactory {
-  const options: ClientOptions = { ...RELAY_WEBSOCKET_OPTIONS };
-  const ca = resolveRelayCertificateAuthorities();
-  if (ca) options.ca = ca;
-  if (proxy) options.agent = new HttpsProxyAgent(proxy.url, ca ? { ca } : {});
-  return function createRelayWebSocket(url) {
-    return new WebSocket(url, options);
-  };
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -129,7 +113,8 @@ export function startRelayTransport({
   serverId,
   daemonKeyPair,
   proxy = null,
-  createWebSocket = createDefaultRelayWebSocketFactory(proxy),
+  gatewayToken,
+  createWebSocket = createRelayWebSocketFactory(proxy, gatewayToken),
 }: RelayTransportOptions): RelayTransportController {
   const relayLogger = logger.child({ module: "relay-transport" });
   if (proxy) {

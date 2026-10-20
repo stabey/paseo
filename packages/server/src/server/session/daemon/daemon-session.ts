@@ -13,6 +13,7 @@ import type { PersistedProjectRecord, PersistedWorkspaceRecord } from "../../wor
 import type { HubRelationshipManagement } from "../../hub/relationship-controller.js";
 import type { DaemonConfigReloadResult } from "../../daemon-config-store.js";
 import type { RelayProxySelection } from "../../relay-proxy.js";
+import type { RelayGatewayStatus } from "../../relay-gateway.js";
 
 export interface DaemonRuntimeConfig {
   listen: string | null;
@@ -27,6 +28,7 @@ export interface DaemonRuntimeConfig {
     publicUseTls: boolean;
   } | null;
   getRelayProxy?(): RelayProxySelection | null;
+  getRelayGatewayStatus?(): RelayGatewayStatus | null;
 }
 
 export interface DaemonSessionHost {

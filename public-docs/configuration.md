@@ -273,6 +273,138 @@ The daemon connects to the relay through an HTTP CONNECT proxy when one is confi
 
 Relay TLS also trusts certificates in the operating system store, so a gateway that re-signs HTTPS with a corporate root works once that root is installed on the machine. The active proxy appears under **Relay proxy** in the host's full status.
 
+### Relay through another daemon
+
+A daemon can optionally provide a **relay gateway** for other daemons that can reach
+it but cannot reach the public relay. For example, a build container can connect
+to a Windows workstation, which opens the upstream relay connections using its
+existing PAC-selected HTTP proxy and system certificate store.
+
+Each daemon keeps its own server ID, keypair, pairing link, agents, and workspaces.
+Clients still connect to the public relay. The gateway forwards relay protocol
+messages and encrypted payloads without decrypting the downstream daemon's
+client sessions. It opens separate control and data sockets for each downstream;
+it does not multiplex them into its own daemon session.
+
+The gateway is disabled by default and uses a separate listener. Its peer
+credentials grant only relay forwarding, not access to the gateway host's agents.
+It accepts daemon-side relay v2 connections to the host's configured
+`daemon.relay.endpoint`; callers cannot choose arbitrary destinations.
+One gateway can serve multiple peers. Chaining gateways is not supported.
+
+#### Authorize a downstream daemon
+
+Initialize the downstream daemon with its own home and read its `serverId` with
+`paseo daemon status --json`. Do not copy the gateway host's home or keypair.
+Generate a different token for each downstream (Node is available with the CLI):
+
+```sh
+node -e "const c=require('node:crypto');const token=c.randomBytes(32).toString('base64url');console.log(JSON.stringify({token,tokenSha256:c.createHash('sha256').update(token).digest('hex')},null,2))"
+```
+
+Store the `token` only on the downstream. Put the `tokenSha256` and that
+downstream's server ID in the gateway host's config. Replace the example
+addresses and capitalized placeholders below and merge these fields with the
+existing config:
+
+```json
+{
+  "daemon": {
+    "relay": {
+      "endpoint": "relay.example.com:443",
+      "useTls": true
+    },
+    "relayGateway": {
+      "enabled": true,
+      "listen": "10.20.0.10:17890",
+      "peers": [
+        {
+          "serverId": "DOWNSTREAM_SERVER_ID",
+          "tokenSha256": "TOKEN_SHA256"
+        }
+      ]
+    }
+  }
+```
+
+Use the existing public relay endpoint on the gateway host. Its own
+`daemon.relay.enabled` controls only its own relay registration; the gateway is
+enabled independently. PAC resolution still happens in Desktop when it launches
+the daemon, exactly as for the host's own relay connections.
+
+For an internal network you trust, the downstream can use the following config:
+
+```json
+{
+  "daemon": {
+    "relay": {
+      "enabled": true,
+      "endpoint": "10.20.0.10:17890",
+      "useTls": false,
+      "publicEndpoint": "relay.example.com:443",
+      "publicUseTls": true,
+      "gatewayToken": "TOKEN"
+    }
+  }
+}
+```
+
+`endpoint` is the reachable gateway listener. `publicEndpoint` is where external
+clients meet this downstream daemon; it must be different from `endpoint`.
+`gatewayToken` authenticates both control and data connections and is never
+included in pairing links. A downstream using a gateway connects directly to
+that gateway, ignoring internet proxy environment variables for this route.
+After restarting the selected daemons, pair clients using the **downstream's**
+`paseo daemon pair` link.
+
+The access token travels in the WebSocket upgrade's Authorization header.
+For a network you do not trust, configure TLS on the gateway and use
+`daemon.relay.useTls: true` on the downstream:
+
+```json
+{
+  "daemon": {
+    "relayGateway": {
+      "tls": {
+        "certFile": "gateway.crt",
+        "keyFile": "gateway.key"
+      }
+    }
+  }
+}
+```
+
+Merge `tls` into the enabled gateway configuration above. Paths are relative to
+that daemon's home; absolute paths also work. The downstream must trust the
+certificate issuer, and the certificate must match the hostname or IP in
+`endpoint`. Bind the gateway to the intended LAN interface and allow only the
+build server's source address through the workstation firewall.
+
+#### Lifecycle and diagnostics
+
+Gateway configuration, peer authorization, certificates, and downstream
+`gatewayToken` are startup settings. `paseo reload` reports that a restart is
+needed. Removing a peer and restarting the gateway revokes its access and closes
+existing forwarding connections.
+
+**Full status** reports the gateway listener, authorized peer count, open and
+pending connection counts, and peer IDs. Default limits are 32 connections total
+and 16 per peer, including pending upstream handshakes. Configure
+`daemon.relayGateway.maxConnections` (1–256) and `maxConnectionsPerPeer` (1–64)
+when needed. Each peer consumes one control connection plus one data connection
+per connected client.
+
+Upstream loss closes the corresponding downstream connections so the existing
+daemon relay reconnect logic can recover. Gateway shutdown closes all forwarded
+connections. The downstream daemon and its agents continue to run when its
+gateway is unavailable.
+
+The gateway reuses the same upstream WebSocket factory and PAC-selected proxy as
+the host daemon. PAC chooses a proxy; it does **not** implement NTLM, Kerberos,
+or interactive proxy login. A `relay_gateway_upstream_rejected` log with status
+407 requires resolving authentication on the gateway host. Relay forwarding
+does not proxy agent model requests.
+
 ## Common env vars
 
 - `PASEO_HOME`, set Paseo home directory

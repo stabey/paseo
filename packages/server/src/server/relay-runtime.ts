@@ -23,6 +23,7 @@ interface RelayRuntimeOptions {
   serverId: string;
   daemonKeyPair: KeyPair;
   proxy?: RelayProxySelection | null;
+  gatewayToken?: string;
   startTransport?: typeof startRelayTransport;
 }
 
@@ -47,6 +48,7 @@ export function createRelayRuntime(options: RelayRuntimeOptions): RelayRuntime {
       serverId: options.serverId,
       daemonKeyPair: options.daemonKeyPair,
       proxy: options.proxy ?? null,
+      gatewayToken: options.gatewayToken,
     });
   }
 

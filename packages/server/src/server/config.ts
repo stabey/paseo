@@ -26,6 +26,7 @@ import type { RequestedSpeechProviders } from "./speech/speech-types.js";
 import { mergeHostnames, parseHostnamesEnv, type HostnamesConfig } from "./hostnames.js";
 import { resolveGitProcessPolicy } from "../utils/git-process-scheduler.js";
 import { resolveRelayProxy, type RelayProxySelection } from "./relay-proxy.js";
+import { resolveRelayGatewayConfig } from "./relay-gateway-config.js";
 
 export {
   loadPersistedConfig,
@@ -281,6 +282,7 @@ interface ResolvedRelay {
   useTls: boolean;
   publicUseTls: boolean;
   proxy: RelayProxySelection | null;
+  gatewayToken?: string;
 }
 
 interface ResolvedServiceProxy {
@@ -301,33 +303,38 @@ function resolveTlsFromEnv(
 
 function resolveRelayConfig(input: ResolveRelayInput): ResolvedRelay {
   const environmentEnabled = parseBooleanEnv(input.env.PASEO_RELAY_ENABLED);
+  const persistedRelay = input.persisted.daemon?.relay ?? {};
   // COMPAT(relayOptInDefault): daemons whose startup config omitted this field
   // retain relay-on removal semantics until 2027-01-31. Modern homes use false.
   const enabled =
-    input.cliRelayEnabled ??
-    environmentEnabled ??
-    input.persisted.daemon?.relay?.enabled ??
-    input.enabledFallback;
+    input.cliRelayEnabled ?? environmentEnabled ?? persistedRelay.enabled ?? input.enabledFallback;
   const endpoint =
-    input.env.PASEO_RELAY_ENDPOINT ??
-    input.persisted.daemon?.relay?.endpoint ??
-    DEFAULT_RELAY_ENDPOINT;
+    input.env.PASEO_RELAY_ENDPOINT ?? persistedRelay.endpoint ?? DEFAULT_RELAY_ENDPOINT;
   const publicEndpoint =
-    input.env.PASEO_RELAY_PUBLIC_ENDPOINT ??
-    input.persisted.daemon?.relay?.publicEndpoint ??
-    endpoint;
+    input.env.PASEO_RELAY_PUBLIC_ENDPOINT ?? persistedRelay.publicEndpoint ?? endpoint;
   const useTls =
     input.cliRelayUseTls ??
     resolveTlsFromEnv(
       input.env.PASEO_RELAY_USE_TLS,
-      input.persisted.daemon?.relay?.useTls,
+      persistedRelay.useTls,
       endpoint === DEFAULT_RELAY_ENDPOINT,
     );
   const publicUseTls = resolveTlsFromEnv(
     input.env.PASEO_RELAY_PUBLIC_USE_TLS,
-    input.persisted.daemon?.relay?.publicUseTls,
+    persistedRelay.publicUseTls,
     useTls,
   );
+  const gatewayToken = persistedRelay.gatewayToken;
+  if (gatewayToken && endpoint === publicEndpoint) {
+    throw new Error(
+      "daemon.relay.gatewayToken requires a gateway endpoint and a different publicEndpoint",
+    );
+  }
+  if (gatewayToken && input.persisted.daemon?.relayGateway?.enabled) {
+    throw new Error(
+      "A relay gateway must connect to the public relay directly; chaining is not supported",
+    );
+  }
   return {
     enabled,
     enabledMutable: input.cliRelayEnabled === undefined && environmentEnabled === undefined,
@@ -335,7 +342,9 @@ function resolveRelayConfig(input: ResolveRelayInput): ResolvedRelay {
     publicEndpoint,
     useTls,
     publicUseTls,
-    proxy: resolveRelayProxy({ env: input.env, endpoint, useTls }),
+    // The gateway is an explicit LAN route, not an internet proxy destination.
+    proxy: gatewayToken ? null : resolveRelayProxy({ env: input.env, endpoint, useTls }),
+    gatewayToken,
   };
 }
 
@@ -644,6 +653,8 @@ export function resolveConfigFromPersisted(
     relayUseTls: relay.useTls,
     relayPublicUseTls: relay.publicUseTls,
     relayProxy: relay.proxy,
+    relayGatewayToken: relay.gatewayToken,
+    relayGateway: resolveRelayGatewayConfig(persisted.daemon?.relayGateway, paseoHome),
     serviceProxy,
     webUi,
     appBaseUrl,

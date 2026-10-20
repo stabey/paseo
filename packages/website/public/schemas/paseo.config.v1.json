@@ -205,6 +205,67 @@
             },
             "publicUseTls": {
               "type": "boolean"
+            },
+            "gatewayToken": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{43,128}$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "relayGateway": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "listen": {
+              "type": "string",
+              "minLength": 1
+            },
+            "peers": {
+              "maxItems": 128,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "serverId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{1,128}$"
+                  },
+                  "tokenSha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": ["serverId", "tokenSha256"],
+                "additionalProperties": false
+              }
+            },
+            "maxConnections": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            },
+            "maxConnectionsPerPeer": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "tls": {
+              "type": "object",
+              "properties": {
+                "certFile": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "keyFile": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": ["certFile", "keyFile"],
+              "additionalProperties": false
             }
           },
           "additionalProperties": false

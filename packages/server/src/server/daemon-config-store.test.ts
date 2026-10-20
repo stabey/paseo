@@ -1033,6 +1033,51 @@ describe("DaemonConfigStore reload", () => {
     expect(changes).toEqual([true, false]);
   });
 
+  test("gateway peer revocation requires a restart", () => {
+    const { paseoHome, store } = createReloadableStore({
+      initialPersisted: {
+        version: 1,
+        daemon: {
+          relayGateway: {
+            enabled: true,
+            peers: [{ serverId: "srv_build", tokenSha256: "a".repeat(64) }],
+          },
+        },
+      },
+    });
+    writeConfig(paseoHome, {
+      version: 1,
+      daemon: {
+        relayGateway: { enabled: false, peers: [] },
+      },
+    });
+    expect(store.reload()).toEqual({
+      appliedPaths: [],
+      restartRequiredPaths: ["daemon.relayGateway.enabled", "daemon.relayGateway.peers"],
+      overrideControlledPaths: [],
+    });
+  });
+
+  test("downstream gateway credentials require a restart", () => {
+    const relay = {
+      endpoint: "windows:17890",
+      publicEndpoint: "relay.example.com:443",
+      gatewayToken: "a".repeat(43),
+    };
+    const { paseoHome, store } = createReloadableStore({
+      initialPersisted: { version: 1, daemon: { relay } },
+    });
+    writeConfig(paseoHome, {
+      version: 1,
+      daemon: { relay: { ...relay, gatewayToken: "b".repeat(43) } },
+    });
+    expect(store.reload()).toEqual({
+      appliedPaths: [],
+      restartRequiredPaths: ["daemon.relay.gatewayToken"],
+      overrideControlledPaths: [],
+    });
+  });
+
   test("classifies every leaf when a parent subtree is added", () => {
     const { paseoHome, store } = createReloadableStore({
       initialPersisted: { version: 1 },

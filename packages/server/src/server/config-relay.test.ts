@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 
 import { loadConfig, resolveConfigFromPersisted } from "./config.js";
+import { PersistedConfigSchema } from "./persisted-config.js";
 
 const roots: string[] = [];
 
@@ -135,6 +136,136 @@ describe("daemon relay config", () => {
         env: { HTTPS_PROXY: "http://proxy.corp.test:8080", NO_PROXY: ".corp.test" },
       }).relayProxy,
     ).toBeNull();
+  });
+
+  test("keeps gateway disabled by default and resolves explicitly authorized peers", async () => {
+    const home = await createPaseoHome({ version: 1 });
+    expect(loadConfig(home, { env: {} }).relayGateway).toBeNull();
+    const configured = resolveConfigFromPersisted(
+      home,
+      {
+        version: 1,
+        daemon: {
+          relayGateway: {
+            enabled: true,
+            listen: "10.20.0.10:17890",
+            peers: [{ serverId: "srv_build", tokenSha256: "a".repeat(64) }],
+            tls: { certFile: "gateway.crt", keyFile: "gateway.key" },
+          },
+        },
+      },
+      { env: {} },
+    );
+    expect(configured.relayGateway).toEqual({
+      listen: { host: "10.20.0.10", port: 17890 },
+      peers: [{ serverId: "srv_build", tokenSha256: "a".repeat(64) }],
+      maxConnections: 32,
+      maxConnectionsPerPeer: 16,
+      tls: {
+        certFile: path.join(home, "gateway.crt"),
+        keyFile: path.join(home, "gateway.key"),
+      },
+    });
+  });
+
+  test("routes a downstream directly to its gateway and keeps the public pairing endpoint", async () => {
+    const home = await createPaseoHome({
+      version: 1,
+      daemon: {
+        relay: {
+          enabled: true,
+          endpoint: "10.20.0.10:17890",
+          useTls: false,
+          publicEndpoint: "relay.example.com:443",
+          publicUseTls: true,
+          gatewayToken: "a".repeat(43),
+        },
+      },
+    });
+    const config = loadConfig(home, { env: { PASEO_RELAY_PROXY: "http://unrelated:8080" } });
+    expect(config.relayEndpoint).toBe("10.20.0.10:17890");
+    expect(config.relayPublicEndpoint).toBe("relay.example.com:443");
+    expect(config.relayPublicUseTls).toBe(true);
+    expect(config.relayUseTls).toBe(false);
+    expect(config.relayProxy).toBeNull();
+    expect(config.relayGatewayToken).toBe("a".repeat(43));
+  });
+
+  test("rejects missing peers, duplicate identities and shared peer tokens", async () => {
+    const home = await createPaseoHome({ version: 1 });
+    for (const peers of [
+      [],
+      [
+        { serverId: "srv_a", tokenSha256: "a".repeat(64) },
+        { serverId: "srv_a", tokenSha256: "b".repeat(64) },
+      ],
+      [
+        { serverId: "srv_a", tokenSha256: "a".repeat(64) },
+        { serverId: "srv_b", tokenSha256: "a".repeat(64) },
+      ],
+    ]) {
+      expect(() =>
+        resolveConfigFromPersisted(
+          home,
+          {
+            version: 1,
+            daemon: { relayGateway: { enabled: true, peers } },
+          },
+          { env: {} },
+        ),
+      ).toThrow();
+    }
+  });
+
+  test("requires a separate public relay for gateway pairing and rejects chaining", async () => {
+    const home = await createPaseoHome({ version: 1 });
+    expect(() =>
+      resolveConfigFromPersisted(
+        home,
+        {
+          version: 1,
+          daemon: { relay: { gatewayToken: "a".repeat(43) } },
+        },
+        { env: {} },
+      ),
+    ).toThrow(/different publicEndpoint/);
+    expect(() =>
+      resolveConfigFromPersisted(
+        home,
+        {
+          version: 1,
+          daemon: {
+            relay: {
+              endpoint: "gateway:6769",
+              publicEndpoint: "relay:443",
+              gatewayToken: "a".repeat(43),
+            },
+            relayGateway: {
+              enabled: true,
+              peers: [{ serverId: "srv_a", tokenSha256: "a".repeat(64) }],
+            },
+          },
+        },
+        { env: {} },
+      ),
+    ).toThrow(/chaining/);
+  });
+
+  test("validates gateway credentials and limits without echoing secrets", () => {
+    for (const gatewayToken of ["short", "x\r\nAuthorization: injected", "a".repeat(129)]) {
+      expect(
+        PersistedConfigSchema.safeParse({
+          version: 1,
+          daemon: { relay: { gatewayToken } },
+        }).success,
+      ).toBe(false);
+    }
+    expect(
+      PersistedConfigSchema.safeParse({
+        version: 1,
+        daemon: { relayGateway: { maxConnections: 0 } },
+      }).success,
+    ).toBe(false);
   });
 
   test("relayPublicUseTls falls back to relayUseTls when unset", async () => {

@@ -146,6 +146,7 @@ function collectProcessEntries(options: DaemonDiagnosticsOptions): DiagnosticEnt
 
 function collectRuntimeConfigEntries(options: DaemonDiagnosticsOptions): DiagnosticEntry[] {
   const relay = options.daemonRuntimeConfig?.getRelayConfig() ?? null;
+  const gateway = options.daemonRuntimeConfig?.getRelayGatewayStatus?.() ?? null;
   return [
     { label: "Listen", value: formatListenKind(options.daemonRuntimeConfig?.listen ?? null) },
     { label: "Relay enabled", value: relay ? String(relay.enabled) : "false" },
@@ -154,6 +155,23 @@ function collectRuntimeConfigEntries(options: DaemonDiagnosticsOptions): Diagnos
     { label: "Relay TLS", value: relay ? String(relay.useTls) : "n/a" },
     { label: "Relay public TLS", value: relay ? String(relay.publicUseTls) : "n/a" },
     { label: "Relay proxy", value: formatRelayProxy(options) },
+    {
+      label: "Relay gateway",
+      value: gateway ? `${gateway.useTls ? "wss" : "ws"}://${gateway.listen}` : "disabled",
+    },
+    ...(gateway
+      ? [
+          { label: "Relay gateway authorized peers", value: String(gateway.authorizedPeers) },
+          {
+            label: "Relay gateway connections",
+            value: `${gateway.connections} open, ${gateway.pendingConnections} pending`,
+          },
+          {
+            label: "Relay gateway connected peers",
+            value: gateway.connectedPeers.join(", ") || "none",
+          },
+        ]
+      : []),
   ];
 }
 

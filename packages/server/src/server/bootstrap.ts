@@ -171,6 +171,8 @@ import { createConfiguredTerminalManager } from "../terminal/terminal-manager-fa
 import { applyTerminalAgentHookSetting } from "../terminal/agent-hooks/terminal-agent-hook-setting.js";
 import { loadOrCreateDaemonKeyPair } from "./daemon-keypair.js";
 import { createRelayRuntime, type RelayRuntime } from "./relay-runtime.js";
+import { startRelayGateway, type RelayGateway } from "./relay-gateway.js";
+import type { RelayGatewayConfig } from "./relay-gateway-config.js";
 import type { RelayProxySelection } from "./relay-proxy.js";
 import type { PushNotificationSender } from "./push/index.js";
 import { getOrCreateServerId } from "./server-id.js";
@@ -429,6 +431,8 @@ export interface PaseoDaemonConfig {
   relayUseTls?: boolean;
   relayPublicUseTls?: boolean;
   relayProxy?: RelayProxySelection | null;
+  relayGatewayToken?: string;
+  relayGateway?: RelayGatewayConfig | null;
   serviceProxy?: {
     publicBaseUrl: string | null;
     standaloneListen: string | null;
@@ -481,6 +485,7 @@ export interface PaseoDaemon {
   stop(): Promise<void>;
   getListenTarget(): ListenTarget | null;
   getServerId(): string;
+  getRelayGatewayStatus(): ReturnType<RelayGateway["getStatus"]> | null;
 }
 
 export interface PaseoDaemonDependencies {
@@ -646,6 +651,7 @@ export async function createPaseoDaemon(
     logger.warn({ err: error }, "Failed to reconcile managed helper process ledger");
   });
   let relayRuntime: RelayRuntime | null = null;
+  let relayGateway: RelayGateway | null = null;
 
   const staticDir = config.staticDir;
   const downloadTokenTtlMs = config.downloadTokenTtlMs ?? 60000;
@@ -1745,6 +1751,7 @@ export async function createPaseoDaemon(
                     publicUseTls: relayPublicUseTls,
                   },
                 getRelayProxy: () => config.relayProxy ?? null,
+                getRelayGatewayStatus: () => relayGateway?.getStatus() ?? null,
               },
               serviceProxyPublicBaseUrl,
               browserToolsBroker,
@@ -1774,7 +1781,18 @@ export async function createPaseoDaemon(
               serverId,
               daemonKeyPair: daemonKeyPair.keyPair,
               proxy: config.relayProxy ?? null,
+              gatewayToken: config.relayGatewayToken,
             });
+            if (config.relayGateway) {
+              relayGateway = await startRelayGateway({
+                config: config.relayGateway,
+                serverId,
+                relayEndpoint,
+                relayUseTls,
+                proxy: config.relayProxy,
+                logger,
+              });
+            }
             daemonConfigStore.onFieldChange("relay.enabled", (value) => {
               relayRuntime?.setEnabled(value === true);
             });
@@ -1803,6 +1821,9 @@ export async function createPaseoDaemon(
     } catch (error) {
       localCredential = null;
       await deleteLocalCredential(config.paseoHome);
+      await relayGateway?.stop().catch(() => undefined);
+      await relayRuntime?.stop().catch(() => undefined);
+      await wsServer?.close().catch(() => undefined);
       unsubscribePluginProviders();
       await pluginRuntime.stopAllPlugins().catch(() => undefined);
       await serviceProxy.stopStandalone().catch(() => undefined);
@@ -1818,6 +1839,7 @@ export async function createPaseoDaemon(
   const stop = async () => {
     localCredential = null;
     await deleteLocalCredential(config.paseoHome);
+    await relayGateway?.stop().catch(() => undefined);
     // Stop tracking plugin provider registrations before anything tears plugins
     // down, so plugin shutdown cannot withdraw a provider from under an agent
     // that is still open. Plugins themselves are stopped once every session
@@ -1877,6 +1899,7 @@ export async function createPaseoDaemon(
     stop,
     getListenTarget: () => boundListenTarget,
     getServerId: () => serverId,
+    getRelayGatewayStatus: () => relayGateway?.getStatus() ?? null,
   };
 }
 
