@@ -25,7 +25,7 @@ describe("runCreateEmptyWorkspace", () => {
     const ensureWorkspace = vi.fn().mockResolvedValue(workspace);
     const { navigate, recorded } = createRecordingNavigate();
 
-    await runCreateEmptyWorkspace({
+    const workspaceId = await runCreateEmptyWorkspace({
       payload: payload(),
       ensureWorkspace,
       serverId: "server-abc",
@@ -40,6 +40,7 @@ describe("runCreateEmptyWorkspace", () => {
       withInitialAgent: false,
     });
     expect(recorded).toEqual([{ serverId: "server-abc", workspaceId: "workspace-123" }]);
+    expect(workspaceId).toBe("workspace-123");
   });
 });
 

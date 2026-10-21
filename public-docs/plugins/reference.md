@@ -1777,6 +1777,14 @@ client.addSlashCommand({
 parsing to the plugin. Paseo owns the autocomplete row, input clearing, and the error toast. It
 does not wait for `onSubmit` or show a pending state; use a composer pill or panel for that.
 
+Workspace commands also appear in the New workspace chat composer before an agent exists.
+Submitting one creates the workspace using the selected project, host, isolation, and branch,
+then invokes the command with that workspace. Typing or selecting an autocomplete item creates
+nothing. Workspace creation locks the composer until it finishes; the command itself follows
+the non-blocking behavior above. No initial agent is created and the command text is not sent
+to a model. Agent commands remain unavailable until there is an agent. If creation fails the
+command is not invoked; leaving the creation screen before it finishes also skips invocation.
+
 Precedence is built-in client commands, plugin commands, then provider commands. A lower-precedence
 collision is omitted. Built-in aliases also reserve their names. The first plugin in stable catalog
 order wins a collision between plugins. Commands do not run while the composer has attachments.
