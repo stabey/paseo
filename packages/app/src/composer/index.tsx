@@ -911,6 +911,8 @@ interface ComposerProps {
   agentId: string;
   serverId: string;
   workspaceId?: string | null;
+  /** New-workspace flows prepare their selected checkout before running a plugin command. */
+  preparePluginWorkspace?: () => Promise<string | null>;
   isPaneFocused: boolean;
   onSubmitMessage?: (payload: MessagePayload) => Promise<void>;
   onClientSlashCommand?: (command: ClientSlashCommand) => Promise<void>;
@@ -1222,6 +1224,7 @@ function ComposerContentImpl({
   agentId,
   serverId,
   workspaceId,
+  preparePluginWorkspace,
   onSubmitMessage,
   onClientSlashCommand,
   hasExternalContent = false,
@@ -1383,6 +1386,7 @@ function ComposerContentImpl({
     serverId,
     workspaceId,
     agentId,
+    prepareWorkspace: preparePluginWorkspace,
   });
   const isComposerLocked = resolveIsComposerLocked(submitBehavior, isSubmitLoading);
   const keyboardHandlerIdRef = useRef(

@@ -18,7 +18,7 @@ export interface CreateEmptyWorkspaceInput {
   navigate: (serverId: string, workspaceId: string) => void;
 }
 
-export async function runCreateEmptyWorkspace(input: CreateEmptyWorkspaceInput): Promise<void> {
+export async function runCreateEmptyWorkspace(input: CreateEmptyWorkspaceInput): Promise<string> {
   const { payload, ensureWorkspace, serverId, navigate } = input;
   const ensuredWorkspace = await ensureWorkspace({
     cwd: payload.cwd,
@@ -27,4 +27,5 @@ export async function runCreateEmptyWorkspace(input: CreateEmptyWorkspaceInput):
     withInitialAgent: false,
   });
   navigate(serverId, ensuredWorkspace.id);
+  return ensuredWorkspace.id;
 }

@@ -1286,6 +1286,40 @@ export function NewWorkspaceScreen({
     ],
   );
 
+  const preparePluginWorkspace = useCallback(async () => {
+    setErrorMessage(null);
+    setPendingAction("empty");
+    try {
+      await updateFormPreferences({ launchTarget });
+      let navigated = false;
+      const workspaceId = await runCreateEmptyWorkspace({
+        payload: { cwd: selectedSourceDirectory ?? "", text: "", attachments: [] },
+        ensureWorkspace: async (request) => (await ensureWorkspace(request)).workspace,
+        serverId: selectedServerId,
+        navigate: (targetServerId, targetWorkspaceId) => {
+          if (!isStillOnCreateScreen()) return;
+          navigated = true;
+          leaveFullscreen();
+          navigateToWorkspace({ serverId: targetServerId, workspaceId: targetWorkspaceId });
+        },
+      });
+      return navigated ? workspaceId : null;
+    } catch (error) {
+      setErrorMessage(toErrorMessage(error));
+      throw error;
+    } finally {
+      setPendingAction(null);
+    }
+  }, [
+    ensureWorkspace,
+    isStillOnCreateScreen,
+    launchTarget,
+    leaveFullscreen,
+    selectedServerId,
+    selectedSourceDirectory,
+    updateFormPreferences,
+  ]);
+
   const handleSubmitNewWorkspace = useCallback(
     async (payload: MessagePayload) => {
       try {
@@ -1559,6 +1593,7 @@ export function NewWorkspaceScreen({
       serverId={selectedServerId}
       isPaneFocused={true}
       onSubmitMessage={handleSubmitNewWorkspace}
+      preparePluginWorkspace={preparePluginWorkspace}
       allowEmptySubmit={true}
       submitButtonAccessibilityLabel={t("newWorkspace.create")}
       submitButtonTestID="workspace-create-submit"
