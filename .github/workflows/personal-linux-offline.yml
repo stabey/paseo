@@ -1,0 +1,60 @@
+name: Personal Linux Offline
+
+on:
+  push:
+    branches: [build/stabey-22-openeuler]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  openeuler:
+    if: github.repository == 'stabey/paseo'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the successful stabey.22 daemon packages
+        uses: actions/download-artifact@v4
+        with:
+          name: paseo-daemon-1b2965488c7fb0686dba4d5d6a33d2425504f35e
+          run-id: 39446746384
+          github-token: ${{ github.token }}
+          path: input-daemon
+      - name: Verify source packages
+        run: |
+          cd input-daemon
+          sha256sum -c SHA256SUMS
+          python3 - <<'PY'
+          import json
+          info = json.load(open('build-info.json'))
+          assert info['version'] == '0.12.0-stabey.22'
+          assert info['commit'] == '1b2965488c7fb0686dba4d5d6a33d2425504f35e'
+          assert str(info['run']) == '39446746384'
+          PY
+      - name: Build native dependencies on openEuler 22.03 x86_64
+        run: docker build --platform linux/amd64 -f scripts/offline-openeuler/Dockerfile -t paseo-offline-check:22 .
+      - name: Verify without network access on clean openEuler
+        run: |
+          mkdir -p artifacts
+          docker run --rm --network none paseo-offline-check:22 /opt/paseo/verify-offline.mjs | tee artifacts/offline-verification.json
+      - name: Export portable daemon directory
+        run: |
+          bundle=paseo-daemon-0.12.0-stabey.22-linux-x64-openeuler22.03-node22
+          container=$(docker create paseo-offline-check:22)
+          trap 'docker rm "$container" >/dev/null' EXIT
+          mkdir -p "$RUNNER_TEMP/$bundle"
+          docker cp "$container:/opt/paseo/." "$RUNNER_TEMP/$bundle/"
+          cp artifacts/offline-verification.json "$RUNNER_TEMP/$bundle/"
+          tar -czf "artifacts/$bundle.tar.gz" -C "$RUNNER_TEMP" "$bundle"
+          cp input-daemon/build-info.json artifacts/
+          cd artifacts
+          sha256sum ./*.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paseo-daemon-linux-x64-openeuler22.03-stabey.22
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,14 @@
+{
+  "name": "paseo-offline-openeuler",
+  "version": "0.12.0-stabey.22",
+  "private": true,
+  "dependencies": {
+    "@getpaseo/cli": "file:../packages/getpaseo-cli-0.12.0-stabey.22.tgz",
+    "@getpaseo/client": "file:../packages/getpaseo-client-0.12.0-stabey.22.tgz",
+    "@getpaseo/highlight": "file:../packages/getpaseo-highlight-0.12.0-stabey.22.tgz",
+    "@getpaseo/plugin": "file:../packages/getpaseo-plugin-0.12.0-stabey.22.tgz",
+    "@getpaseo/protocol": "file:../packages/getpaseo-protocol-0.12.0-stabey.22.tgz",
+    "@getpaseo/relay": "file:../packages/getpaseo-relay-0.12.0-stabey.22.tgz",
+    "@getpaseo/server": "file:../packages/getpaseo-server-0.12.0-stabey.22.tgz"
+  }
+}

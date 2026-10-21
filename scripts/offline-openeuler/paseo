@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+paseo_bundle=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+exec "${PASEO_NODE:-node}" "$paseo_bundle/install/node_modules/@getpaseo/cli/bin/paseo" "$@"
