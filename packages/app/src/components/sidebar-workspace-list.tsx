@@ -1806,6 +1806,7 @@ function ProjectBlock({
           project={project}
           serverId={repoTreeServerId}
           displayName={displayName}
+          workspaceEntriesByKey={workspaceEntriesByKey}
           renderWorkspaceRow={renderWorkspaceRow}
           onWorkspacePress={onWorkspacePress}
           fallback={projectChildren}

@@ -10,6 +10,7 @@ import { PressHighlight } from "@/components/ui/press-highlight";
 import { sidebarWorkspaceRowStyles } from "@/components/sidebar/sidebar-workspace-row-content";
 import type {
   SidebarProjectEntry,
+  SidebarWorkspaceEntry,
   SidebarWorkspacePlacement,
 } from "@/hooks/sidebar-workspaces-view-model";
 import {
@@ -35,6 +36,7 @@ export function SidebarRepoTreeChildren({
   project,
   serverId,
   displayName,
+  workspaceEntriesByKey,
   renderWorkspaceRow,
   onWorkspacePress,
   fallback,
@@ -42,6 +44,8 @@ export function SidebarRepoTreeChildren({
   project: SidebarProjectEntry;
   serverId: string;
   displayName: string;
+  /** Carries each workspace's directory; project placements leave it unset. */
+  workspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
   renderWorkspaceRow: (workspace: SidebarWorkspacePlacement) => ReactNode;
   onWorkspacePress?: () => void;
   fallback: ReactElement | null;
@@ -54,8 +58,19 @@ export function SidebarRepoTreeChildren({
     ),
   );
   const tree = useMemo(
-    () => (repos ? buildProjectRepoTree({ repos, workspaces: project.workspaces }) : null),
-    [repos, project.workspaces],
+    () =>
+      repos
+        ? buildProjectRepoTree({
+            repos,
+            workspaces: project.workspaces.map((workspace) => ({
+              workspaceKey: workspace.workspaceKey,
+              workspaceDirectory:
+                workspaceEntriesByKey.get(workspace.workspaceKey)?.workspaceDirectory ??
+                workspace.workspaceDirectory,
+            })),
+          })
+        : null,
+    [repos, project.workspaces, workspaceEntriesByKey],
   );
   const placementsByKey = useMemo(
     () => new Map(project.workspaces.map((workspace) => [workspace.workspaceKey, workspace])),
