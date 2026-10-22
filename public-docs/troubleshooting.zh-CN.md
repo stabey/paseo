@@ -82,6 +82,22 @@ paseo --host <host:port> provider diagnostic <provider> --json
 
 这一登录 shell 步骤在 macOS 和 Linux 上运行。在 Windows 上，Paseo 使用它启动时所带的环境。
 
+## 在 Desktop 上选择本地服务器 {#choosing-a-local-server-on-desktop}
+
+Desktop 默认管理其内置 daemon。在启动新进程之前，它会检查配置的本地 TCP 地址上是否已有 Paseo daemon，有则直接使用该连接，包括用不同 `PASEO_HOME` 启动的 daemon。位于 Desktop 自身主目录中的现有实例沿用原来的复用和认证路径。如果发现的 daemon 需要密码，Desktop 会打开连接表单，而不是启动一个冲突的进程。
+
+显式配置的自定义监听地址优先于默认端口。如果没有可用的本地 Paseo daemon，Desktop 会像以前一样启动内置 daemon。在设置中关闭内置 daemon 管理仍会禁用自动启动。
+
+直接连接会自动检查端口 `6767` 以及 Desktop 的 daemon 配置或运行实例文件中记录的本地端口上的回环 TCP 监听。选择一个发现的 daemon 即可填入其地址，然后连接。受密码保护的 daemon 仍需要密码。其他 TCP 端口和远程主机可以手动输入。发现过程不会搜索 socket/pipe 监听，也不会扫描局域网。
+
+启用后，内置 daemon 会随 Desktop 启动。默认情况下，退出 Desktop 会停止它在本次会话中启动的 daemon。**退出后保持 daemon 运行** 可以改变这一行为。连接到独立启动的 daemon 不会让 Desktop 接管其生命周期。
+
+## Desktop 无法启动本地服务器 {#desktop-cannot-start-its-local-server}
+
+如果本地服务器启动失败，在错误界面选择 **不使用本地服务器继续**。这会为当前 Desktop 客户端关闭本地服务器的自动启动，并允许你打开设置或连接到已有主机。之后可以在设置中重新启用内置 daemon。
+
+`EADDRINUSE` 表示已有其他进程占用了配置的监听地址。如果无法将该进程识别为可用的 Paseo daemon，Desktop 仍可能报告启动错误。请不使用本地服务器继续，检查连接，或选择 **设置 → 添加主机 → 直接连接**。见[连接方式](/docs/connectivity)。
+
 ## 查看日志 {#reading-the-logs}
 
 - **桌面应用**：登录 shell 的解析过程记录在这里。查找 `[login-shell-env]`：`applied` 表示成功（会记录前后的 `PATH`）；`failed; keeping inherited env` 表示它退回到了精简环境，并附带 `reason`（超时、shell 配置以非零状态退出、没有输出等）。最常见的原因是 `.zshrc`/`.zprofile` 运行缓慢或出错。

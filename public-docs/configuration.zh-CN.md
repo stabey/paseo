@@ -82,6 +82,26 @@ Agent Provider，包括 Paseo 自带的一等 Provider 和你在 `agents.provide
 
 心智模型见 [Provider](/docs/providers)，Paseo 可以启动的全部 Agent 见[支持的 Provider](/docs/supported-providers)。要让 Claude 指向兼容 Anthropic 的端点（Z.AI、Alibaba/Qwen）、使用多个配置、自定义二进制文件、ACP Agent，以及了解 `additionalModels` 的合并行为，见[自定义 Provider](/docs/custom-providers)。完整的字段参考在 GitHub 上的 [docs/custom-providers.md](https://github.com/getpaseo/paseo/blob/main/docs/custom-providers.md)。
 
+## 项目目录搜索 {#project-directory-search}
+
+项目关键字搜索默认只搜索 daemon 用户的主目录。在 **设置 → 主机 → 项目 → 项目搜索目录** 中选择主机，添加或删除目录，然后选择 **保存**。更改立即生效。**重置为主目录** 保存后恢复为只搜索主目录。此编辑器需要主机支持项目搜索目录。
+
+也可以在 `projects.searchRoots` 中加入外置磁盘或其他检出位置：
+
+```json
+{
+  "projects": {
+    "searchRoots": ["~", "/Volumes/macport"]
+  }
+}
+```
+
+该列表会替换默认根目录，因此要继续搜索主目录请保留 `~`。提供 1–16 个绝对路径或以 `~/` 开头的路径；路径属于 daemon 所在主机，而不是手机或浏览器。重叠根目录的结果会去重并一起排序。搜索在所有根目录间共享一个有上限的扫描预算，并跳过缺失或不可读的目录，包括未挂载的磁盘。移除 `projects.searchRoots` 即恢复只搜索主目录的默认行为。
+
+编辑文件后运行 `paseo reload`。现有客户端随后的搜索会使用新的根目录，无需重启 Agent。例如，使用上面的配置，`bridge` 可以找到 `/Volumes/macport/bridge`。`~/...` 和 `./...` 仍指向主目录；显式输入的绝对路径即使在配置的搜索根目录之外也会浏览该位置。空查询不会扫描根目录。
+
+这些设置只控制项目发现，不控制文件访问权限。它们不会改变 workspace 或输入框搜索的范围，也不会改变 daemon 用户可以打开哪些目录。
+
 ## worktree {#worktrees}
 
 新的 worktree 默认创建在 `$PASEO_HOME/worktrees` 下。要把新的 worktree 放到其他位置，请设置 `worktrees.root`：
@@ -232,6 +252,12 @@ URI 中的 `password=` 总是优先于环境变量，因此你可以全局设置
 ```
 
 `PASEO_RELAY_ENABLED=true|false` 会为前台部署覆盖文件中的值。托管的 `start` 使用文件中的值。在通过应用或 `paseo daemon pair --relay` 修改中继之前，请结束并重新启动部署以移除它的覆盖项。
+
+### 通过代理连接中继 {#relay-through-a-proxy}
+
+配置了 HTTP CONNECT 代理时，daemon 会通过该代理连接中继。Paseo Desktop 每次启动自己的 daemon 时，都会针对中继地址解析系统代理设置，包括 PAC 和 WPAD。其他 daemon 读取 `HTTPS_PROXY`（无 TLS 的中继读取 `HTTP_PROXY`）或 `ALL_PROXY`，并在 `NO_PROXY` 匹配中继主机时跳过代理。`PASEO_RELAY_PROXY` 会覆盖以上两者；设为 `direct` 表示不经代理直接连接。不支持 SOCKS 代理。
+
+中继的 TLS 同时信任操作系统证书库中的证书，因此只要在机器上安装了企业根证书，使用该根证书重签 HTTPS 的网关也能正常工作。当前生效的代理显示在主机完整状态的 **Relay proxy** 一行。
 
 ## 常用环境变量 {#common-env-vars}
 
