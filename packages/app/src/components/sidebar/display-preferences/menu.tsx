@@ -367,6 +367,14 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
           >
             {t("sidebar.display.showBackground")}
           </MenuItem>
+          <MenuItem
+            selected={preferences.repoTree}
+            closeOnSelect={false}
+            onSelect={preferences.toggleRepoTree}
+            testID="sidebar-display-repo-tree"
+          >
+            {t("sidebar.display.repoTree")}
+          </MenuItem>
         </MenuSurface>
       </MenuRoot>
       <WorkspaceLabelManagerModal visible={managerOpen} onClose={closeManager} />

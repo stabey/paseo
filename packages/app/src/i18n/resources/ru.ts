@@ -1178,8 +1178,16 @@ export const ru: TranslationResources = {
       working: "В работе",
       done: "Готово",
     },
+    repoTree: {
+      main: "основной",
+      external: "внешний",
+      reference: "справочный",
+      otherWorkspaces: "Другие пространства",
+      newWorkspaceHere: "Новое пространство здесь",
+    },
     display: {
       showBackground: "Показать фоновые пространства",
+      repoTree: "Дерево репозиториев (экспериментально)",
       trigger: "Настройки отображения",
       heading: "Отображение",
       grouping: {

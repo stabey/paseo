@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ProjectRepoPayloadSchema,
   AgentStatusSchema,
   AgentTimelineItemPayloadSchema,
   WorkspaceGitHubRuntimePayloadSchema,
@@ -337,6 +338,8 @@ const StoredProjectSchema = z.strictObject({
   projectIconRevision: z.string().optional(),
   projectRootPath: z.string(),
   projectKind: z.enum(["git", "non_git", "directory"]),
+  repos: z.array(ProjectRepoPayloadSchema).optional(),
+  reposScannedAt: z.string().optional(),
 });
 
 const StoredTimelineSchema = z.strictObject({
@@ -742,6 +745,7 @@ function serializeProject(project: ProjectDescriptor): StoredProject {
     projectIconRevision: project.projectIconRevision,
     projectRootPath: project.projectRootPath,
     projectKind: project.projectKind,
+    ...(project.repos ? { repos: project.repos, reposScannedAt: project.reposScannedAt } : {}),
   };
 }
 

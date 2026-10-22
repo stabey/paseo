@@ -29,6 +29,8 @@ export interface SidebarDisplayPreferences {
   trailing: SidebarWorkspaceTrailing;
   /** Picking the choice that is already showing clears the slot. */
   toggleTrailing: (choice: SidebarTrailingChoice) => void;
+  repoTree: boolean;
+  toggleRepoTree: () => void;
   hostFilters: readonly string[];
   toggleHostFilter: (serverId: string) => void;
   clearHostFilters: () => void;
@@ -70,9 +72,14 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       sidebarWorkspaceTrailing,
       sidebarRowItems,
       sidebarChecksDisplay,
+      sidebarRepoTree,
     },
     updateSettings,
   } = useAppSettings();
+
+  const toggleRepoTree = useCallback(() => {
+    void updateSettings({ sidebarRepoTree: !sidebarRepoTree });
+  }, [updateSettings, sidebarRepoTree]);
 
   const setTitleSource = useCallback(
     (source: WorkspaceTitleSource) => {
@@ -120,6 +127,8 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       setChecksDisplay,
       trailing: sidebarWorkspaceTrailing,
       toggleTrailing,
+      repoTree: sidebarRepoTree,
+      toggleRepoTree,
       hostFilters,
       toggleHostFilter,
       clearHostFilters,
@@ -143,6 +152,8 @@ export function useSidebarDisplayPreferences(): SidebarDisplayPreferences {
       setChecksDisplay,
       sidebarWorkspaceTrailing,
       toggleTrailing,
+      sidebarRepoTree,
+      toggleRepoTree,
       hostFilters,
       toggleHostFilter,
       clearHostFilters,

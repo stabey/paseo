@@ -38,6 +38,7 @@ import type {
   ProjectPlacementPayload,
   ServerCapabilities,
   WorkspaceDescriptorPayload,
+  ProjectRepoPayload,
   WorkspaceProjectDescriptorPayload,
 } from "@getpaseo/protocol/messages";
 import {
@@ -184,6 +185,9 @@ export interface ProjectDescriptor {
   projectIconRevision?: string;
   projectRootPath: string;
   projectKind: WorkspaceDescriptorPayload["projectKind"];
+  /** Repositories found in the project folder; absent on hosts without `projectRepos`. */
+  repos?: ProjectRepoPayload[];
+  reposScannedAt?: string;
 }
 
 export function normalizeProjectDescriptor(
@@ -198,6 +202,7 @@ export function normalizeProjectDescriptor(
     projectIconRevision: payload.projectIconRevision,
     projectRootPath: payload.projectRootPath,
     projectKind: payload.projectKind,
+    ...(payload.repos ? { repos: payload.repos, reposScannedAt: payload.reposScannedAt } : {}),
   };
 }
 

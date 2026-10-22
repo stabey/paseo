@@ -1169,8 +1169,16 @@ export const en = {
       working: "Working",
       done: "Done",
     },
+    repoTree: {
+      main: "main",
+      external: "external",
+      reference: "reference",
+      otherWorkspaces: "Other workspaces",
+      newWorkspaceHere: "New workspace here",
+    },
     display: {
       showBackground: "Show background",
+      repoTree: "Repository tree (experimental)",
       trigger: "Display preferences",
       heading: "Display",
       grouping: {

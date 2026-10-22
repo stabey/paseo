@@ -1174,8 +1174,16 @@ export const ja: TranslationResources = {
       working: "実行中",
       done: "完了",
     },
+    repoTree: {
+      main: "メイン",
+      external: "外部",
+      reference: "参照",
+      otherWorkspaces: "その他のワークスペース",
+      newWorkspaceHere: "ここに新しいワークスペース",
+    },
     display: {
       showBackground: "バックグラウンドを表示",
+      repoTree: "リポジトリツリー（実験的）",
       trigger: "表示設定",
       heading: "表示",
       grouping: {

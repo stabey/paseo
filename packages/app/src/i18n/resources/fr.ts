@@ -1190,8 +1190,16 @@ export const fr: TranslationResources = {
       working: "En cours",
       done: "Terminé",
     },
+    repoTree: {
+      main: "principal",
+      external: "externe",
+      reference: "référence",
+      otherWorkspaces: "Autres espaces",
+      newWorkspaceHere: "Nouvel espace ici",
+    },
     display: {
       showBackground: "Afficher les espaces en arrière-plan",
+      repoTree: "Arborescence des dépôts (expérimental)",
       trigger: "Préférences d’affichage",
       heading: "Affichage",
       grouping: {

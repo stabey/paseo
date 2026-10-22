@@ -1153,8 +1153,16 @@ export const zhCN: TranslationResources = {
       working: "运行中",
       done: "已完成",
     },
+    repoTree: {
+      main: "主检出",
+      external: "外部",
+      reference: "参考",
+      otherWorkspaces: "其他工作区",
+      newWorkspaceHere: "在此新建工作区",
+    },
     display: {
       showBackground: "显示后台工作区",
+      repoTree: "仓库树（实验）",
       trigger: "显示偏好",
       heading: "显示",
       grouping: {

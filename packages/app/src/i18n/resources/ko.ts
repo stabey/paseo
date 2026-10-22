@@ -1168,8 +1168,16 @@ export const ko: TranslationResources = {
       working: "실행 중",
       done: "완료",
     },
+    repoTree: {
+      main: "메인",
+      external: "외부",
+      reference: "참조",
+      otherWorkspaces: "기타 워크스페이스",
+      newWorkspaceHere: "여기에 새 워크스페이스",
+    },
     display: {
       showBackground: "백그라운드 표시",
+      repoTree: "저장소 트리(실험적)",
       trigger: "표시 설정",
       heading: "표시",
       grouping: {

@@ -1187,8 +1187,16 @@ export const ptBR: TranslationResources = {
       working: "Em execução",
       done: "Concluído",
     },
+    repoTree: {
+      main: "principal",
+      external: "externo",
+      reference: "referência",
+      otherWorkspaces: "Outros espaços",
+      newWorkspaceHere: "Novo espaço aqui",
+    },
     display: {
       showBackground: "Mostrar espaços em segundo plano",
+      repoTree: "Árvore de repositórios (experimental)",
       trigger: "Preferências de exibição",
       heading: "Exibição",
       grouping: {

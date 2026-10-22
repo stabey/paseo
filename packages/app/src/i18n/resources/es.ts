@@ -1197,8 +1197,16 @@ export const es: TranslationResources = {
       working: "En ejecución",
       done: "Terminado",
     },
+    repoTree: {
+      main: "principal",
+      external: "externo",
+      reference: "referencia",
+      otherWorkspaces: "Otros espacios",
+      newWorkspaceHere: "Nuevo espacio aquí",
+    },
     display: {
       showBackground: "Mostrar espacios en segundo plano",
+      repoTree: "Árbol de repositorios (experimental)",
       trigger: "Preferencias de visualización",
       heading: "Visualización",
       grouping: {

@@ -99,6 +99,8 @@ import {
 import { useLongPressDragInteraction } from "@/components/sidebar/use-long-press-drag-interaction";
 import { SidebarSectionHeader } from "@/components/sidebar/sidebar-section-header";
 import { SidebarGroupToggleRow } from "@/components/sidebar/sidebar-group-toggle-row";
+import { SidebarRepoTreeChildren } from "@/components/sidebar/sidebar-repo-tree";
+import { useAppSettings } from "@/hooks/use-settings";
 import { useLimitedSidebarGroup } from "@/components/sidebar/use-limited-sidebar-group";
 import {
   SidebarWorkspaceRowFrame,
@@ -1603,6 +1605,12 @@ function ProjectBlock({
   const activeServerId = activeWorkspaceSelection?.serverId ?? null;
   const activeHostStatus = useHostRuntimeConnectionStatus(activeServerId ?? "");
   const preferredServerId = activeHostStatus === "online" ? activeServerId : null;
+  const {
+    settings: { sidebarRepoTree },
+  } = useAppSettings();
+  const repoTreeServerId = sidebarRepoTree
+    ? (preferredServerId ?? project.hosts[0]?.serverId ?? null)
+    : null;
   const rowModel = useMemo(
     () =>
       buildSidebarProjectRowModel({
@@ -1754,7 +1762,7 @@ function ProjectBlock({
     onToggleCollapsed(project.viewKey);
   }, [onToggleCollapsed, project.viewKey]);
 
-  let projectChildren = null;
+  let projectChildren: ReactElement | null = null;
   if (!collapsed) {
     if (project.workspaces.length > 0) {
       projectChildren = (
@@ -1789,6 +1797,18 @@ function ProjectBlock({
           displayName={displayName}
           worktreeTarget={rowModel.trailingAction.target}
           onWorkspacePress={onWorkspacePress}
+        />
+      );
+    }
+    if (repoTreeServerId) {
+      projectChildren = (
+        <SidebarRepoTreeChildren
+          project={project}
+          serverId={repoTreeServerId}
+          displayName={displayName}
+          renderWorkspaceRow={renderWorkspaceRow}
+          onWorkspacePress={onWorkspacePress}
+          fallback={projectChildren}
         />
       );
     }

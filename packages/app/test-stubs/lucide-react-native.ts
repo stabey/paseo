@@ -42,6 +42,7 @@ export const EyeOff = StubIcon;
 export const File = StubIcon;
 export const FileText = StubIcon;
 export const Folder = StubIcon;
+export const FolderGit2 = StubIcon;
 export const FolderPlus = StubIcon;
 export const FolderTree = StubIcon;
 export const Gift = StubIcon;

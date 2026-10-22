@@ -1161,8 +1161,16 @@ export const ar: TranslationResources = {
       working: "قيد العمل",
       done: "تم",
     },
+    repoTree: {
+      main: "الرئيسي",
+      external: "خارجي",
+      reference: "مرجعي",
+      otherWorkspaces: "مساحات عمل أخرى",
+      newWorkspaceHere: "مساحة عمل جديدة هنا",
+    },
     display: {
       showBackground: "إظهار مساحات العمل في الخلفية",
+      repoTree: "شجرة المستودعات (تجريبي)",
       trigger: "تفضيلات العرض",
       heading: "العرض",
       grouping: {
