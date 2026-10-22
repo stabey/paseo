@@ -1,6 +1,7 @@
 import { verifyAttachedDaemonControls } from "./daemon-lifecycle-renderer.electron.mjs";
 import { verifyStartupFailureRecovery } from "./daemon-startup-recovery.electron.mjs";
 import { once } from "node:events";
+import { execFile } from "node:child_process";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, readFile, rm, readdir, copyFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -226,6 +227,19 @@ try {
   for (const name of await readdir(root))
     if (name.endsWith(".png") || name.endsWith(".log"))
       await copyFile(path.join(root, name), path.join(artifacts, name));
-  await rm(root, { recursive: true, force: true });
+  await removeTree(root);
   console.log(`Lifecycle artifacts: ${artifacts}`);
+}
+
+// Metro's dotslash cache under the temporary HOME contains read-only directories, which makes a
+// plain recursive rm fail with EACCES on Linux. Restore write permission, then remove.
+async function removeTree(target) {
+  try {
+    await rm(target, { recursive: true, force: true });
+  } catch (error) {
+    if (error?.code !== "EACCES" && error?.code !== "EPERM") throw error;
+    if (process.platform !== "win32")
+      await new Promise((resolve) => execFile("chmod", ["-R", "u+rwX", target], () => resolve()));
+    await rm(target, { recursive: true, force: true });
+  }
 }
