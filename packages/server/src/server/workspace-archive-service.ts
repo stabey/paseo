@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 import type { Logger } from "pino";
 
@@ -272,11 +272,13 @@ async function resolveWorkspaceBackingDirectory(
   dependencies: Pick<ArchiveDependencies, "paseoHome" | "paseoWorktreesBaseRoot">,
 ): Promise<BackingDirectory> {
   if (workspace.isPaseoOwnedWorktree && workspace.worktreeRoot && workspace.mainRepoRoot) {
+    // The record is the ownership proof. Its parent is the root to delete under, which is
+    // the per-repo hash dir for managed worktrees and the placement root for the rest.
     return {
       path: resolve(workspace.worktreeRoot),
       isPaseoOwnedWorktree: true,
       mainRepoRoot: workspace.mainRepoRoot,
-      paseoWorktreesRoot: null,
+      paseoWorktreesRoot: dirname(resolve(workspace.worktreeRoot)),
     };
   }
   if (workspace.kind !== "worktree") {

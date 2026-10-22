@@ -107,7 +107,7 @@ describe("ProjectRepoCatalog", () => {
     expect(existsSync(path.join(paseoHome, "projects", "prj_catalog.json"))).toBe(true);
   });
 
-  it("marks main, sibling and adopted checkouts as managed and the rest as external", async () => {
+  it("marks main and adopted checkouts as managed and plain git worktrees as external", async () => {
     await registry.update("prj_catalog", (record) => ({
       ...record,
       repos: [
@@ -131,7 +131,7 @@ describe("ProjectRepoCatalog", () => {
       .sort((left, right) => String(left[0]).localeCompare(String(right[0])));
     expect(managedByBranch).toEqual([
       ["main", true],
-      ["wt-a", true],
+      ["wt-a", false],
       ["wt-b", false],
     ]);
 

@@ -34,7 +34,12 @@ import { parseGitRevParsePath, resolveGitRevParsePath } from "./git-rev-parse-pa
 import { runGitCommand, type RunGitCommand } from "./run-git-command.js";
 import { readGitFileContents } from "./git-file-contents.js";
 import { unquoteGitPath } from "./git-quoted-path.js";
-import { isPaseoOwnedWorktreeCwd, resolvePaseoWorktreesBaseRoot } from "./worktree.js";
+import {
+  findLinkedWorktreeRoot,
+  isPaseoOwnedWorktreeCwd,
+  resolvePaseoWorktreesBaseRoot,
+} from "./worktree.js";
+import { readPaseoWorktreePlacement } from "./worktree-metadata.js";
 import {
   branchNameFromRef,
   getPaseoWorktreeChangeRequestHintForBranch,
@@ -1248,8 +1253,9 @@ async function getPaseoWorktreeForCwd(
   cwd: string,
   options: PaseoWorktreeLookupOptions = {},
 ): Promise<PaseoWorktreeForCwd> {
-  // Fast-path reject: non-worktree paths do not need expensive ownership checks.
-  if (!/[\\/]worktrees[\\/]/.test(cwd)) {
+  // Fast-path reject: paths that are neither under a managed worktrees root nor inside a
+  // linked worktree with a placement record do not need the git-backed ownership check.
+  if (!/[\\/]worktrees[\\/]/.test(cwd) && !hasPlacedWorktreeAncestor(cwd)) {
     return { isPaseoOwnedWorktree: false };
   }
 
@@ -1266,6 +1272,11 @@ async function getPaseoWorktreeForCwd(
     isPaseoOwnedWorktree: true,
     worktreeRoot: options.knownWorktreeRoot ?? (await getWorktreeRoot(cwd, options.context)) ?? cwd,
   };
+}
+
+function hasPlacedWorktreeAncestor(cwd: string): boolean {
+  const worktreeRoot = findLinkedWorktreeRoot(cwd);
+  return worktreeRoot !== null && readPaseoWorktreePlacement(worktreeRoot) !== null;
 }
 
 // Worktrees created before baseRef existed only stored the stripped name; it resolves

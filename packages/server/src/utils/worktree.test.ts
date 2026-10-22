@@ -180,6 +180,64 @@ describe("paseo worktree manager", () => {
     });
   });
 
+  it("places a worktree in an explicit directory and owns it through its placement record", async () => {
+    const siblingRoot = join(tempDir, "test-repo.wt");
+    const created = await createWorktreePrimitive({
+      cwd: repoDir,
+      worktreeSlug: "placed",
+      source: { kind: "branch-off", baseBranch: "main", branchName: "placed-branch" },
+      paseoHome,
+      worktreeDirectory: siblingRoot,
+    });
+
+    expect(created.worktreePath).toBe(join(siblingRoot, "placed"));
+    await expect(
+      isPaseoOwnedWorktreeCwd(join(created.worktreePath, "deep", "dir"), { paseoHome }),
+    ).resolves.toMatchObject({
+      allowed: true,
+      worktreeRoot: siblingRoot,
+      worktreePath: created.worktreePath,
+    });
+    // A sibling created by plain git next to it stays unowned.
+    execFileSync(
+      "git",
+      ["worktree", "add", "--quiet", "-b", "manual", join(siblingRoot, "manual")],
+      {
+        cwd: repoDir,
+      },
+    );
+    await expect(
+      isPaseoOwnedWorktreeCwd(join(siblingRoot, "manual"), { paseoHome }),
+    ).resolves.toMatchObject({ allowed: false });
+
+    await deletePaseoWorktree({ cwd: repoDir, worktreePath: created.worktreePath, paseoHome });
+    expect(existsSync(created.worktreePath)).toBe(false);
+    await expect(
+      deletePaseoWorktree({ cwd: repoDir, worktreePath: join(siblingRoot, "manual"), paseoHome }),
+    ).rejects.toThrow(/Refusing to delete non-Paseo worktree/);
+  });
+
+  it("reports where a restored branch is already checked out", async () => {
+    const first = await createLegacyWorktreeForTest({
+      branchName: "busy-branch",
+      cwd: repoDir,
+      baseBranch: "main",
+      worktreeSlug: "busy",
+      paseoHome,
+    });
+    await expect(
+      createWorktreePrimitive({
+        cwd: repoDir,
+        worktreeSlug: "busy-again",
+        source: { kind: "restore", branchName: "busy-branch", baseRef: null },
+        paseoHome,
+      }),
+    ).rejects.toMatchObject({
+      name: "BranchAlreadyCheckedOutError",
+      checkedOutAt: first.worktreePath,
+    });
+  });
+
   it("rejects paths that are not under the paseo worktrees root", async () => {
     const outsidePath = join(tempDir, "outside-paseo-home");
     mkdirSync(outsidePath, { recursive: true });

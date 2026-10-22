@@ -1008,6 +1008,18 @@ export const ProjectRepoSettingsSetRequestSchema = z.object({
   requestId: z.string(),
 });
 
+/**
+ * Take a worktree created outside Paseo under management: it becomes archivable and deletable
+ * like a Paseo-created worktree. `worktreePath` must be a linked checkout of the repository.
+ */
+export const ProjectRepoAdoptWorktreeRequestSchema = z.object({
+  type: z.literal("project.repo.adopt_worktree.request"),
+  projectId: z.string(),
+  relPath: z.string(),
+  worktreePath: z.string(),
+  requestId: z.string(),
+});
+
 export const ProjectIconSetRequestSchema = z.object({
   type: z.literal("project.icon.set.request"),
   projectId: z.string(),
@@ -2128,6 +2140,11 @@ export const ProjectReposRefreshResponseSchema = z.object({
 
 export const ProjectRepoSettingsSetResponseSchema = z.object({
   type: z.literal("project.repos.settings.set.response"),
+  payload: ProjectReposResponsePayloadSchema,
+});
+
+export const ProjectRepoAdoptWorktreeResponseSchema = z.object({
+  type: z.literal("project.repo.adopt_worktree.response"),
   payload: ProjectReposResponsePayloadSchema,
 });
 
@@ -3316,6 +3333,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ProjectRenameRequestSchema,
   ProjectReposRefreshRequestSchema,
   ProjectRepoSettingsSetRequestSchema,
+  ProjectRepoAdoptWorktreeRequestSchema,
   ProjectIconSetRequestSchema,
   ProjectRemoveRequestSchema,
   WorkspaceTitleSetRequestSchema,
@@ -7150,6 +7168,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ProjectRenameResponseSchema,
   ProjectReposRefreshResponseSchema,
   ProjectRepoSettingsSetResponseSchema,
+  ProjectRepoAdoptWorktreeResponseSchema,
   ProjectIconSetResponseSchema,
   ProjectRemoveResponseSchema,
   WorkspaceTitleSetResponseSchema,
@@ -7353,6 +7372,9 @@ export type UpdateAgentResponseMessage = z.infer<typeof UpdateAgentResponseMessa
 export type ProjectRenameResponse = z.infer<typeof ProjectRenameResponseSchema>;
 export type ProjectReposRefreshResponse = z.infer<typeof ProjectReposRefreshResponseSchema>;
 export type ProjectRepoSettingsSetResponse = z.infer<typeof ProjectRepoSettingsSetResponseSchema>;
+export type ProjectRepoAdoptWorktreeResponse = z.infer<
+  typeof ProjectRepoAdoptWorktreeResponseSchema
+>;
 export type ProjectIconSetResponse = z.infer<typeof ProjectIconSetResponseSchema>;
 export type ProjectRemoveResponse = z.infer<typeof ProjectRemoveResponseSchema>;
 export type WorkspaceTitleSetResponse = z.infer<typeof WorkspaceTitleSetResponseSchema>;
@@ -7509,6 +7531,7 @@ export type ProjectIconSource = z.infer<typeof ProjectIconSourceSchema>;
 export type ProjectRenameRequest = z.infer<typeof ProjectRenameRequestSchema>;
 export type ProjectReposRefreshRequest = z.infer<typeof ProjectReposRefreshRequestSchema>;
 export type ProjectRepoSettingsSetRequest = z.infer<typeof ProjectRepoSettingsSetRequestSchema>;
+export type ProjectRepoAdoptWorktreeRequest = z.infer<typeof ProjectRepoAdoptWorktreeRequestSchema>;
 export type ProjectRepoRole = z.infer<typeof ProjectRepoRoleSchema>;
 export type ProjectRepoWorktreeLocation = z.infer<typeof ProjectRepoWorktreeLocationSchema>;
 export type ProjectRepoPayload = z.infer<typeof ProjectRepoPayloadSchema>;

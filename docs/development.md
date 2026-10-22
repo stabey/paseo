@@ -418,6 +418,23 @@ that reads what it needs from `process.env` and invoke it as
 }
 ```
 
+`worktree.include` copies checkout-relative paths from the source checkout into a new worktree,
+and `worktree.linkDirectories` symlinks directories back to the source checkout. Both run after
+`git worktree add` and before `setup`, so setup can rely on the material. Existing files in the
+worktree win (tracked files are never overwritten), a link is skipped when the worktree already
+has that path, and entries may not escape the checkout. Use `include` for small untracked state
+(`.env`, local certificates) and `linkDirectories` for caches that are expensive to rebuild and
+safe to share (`node_modules` when the lockfile rarely changes between branches).
+
+```json
+{
+  "worktree": {
+    "include": [".env", "config/local.json"],
+    "linkDirectories": ["node_modules"]
+  }
+}
+```
+
 Every `scripts` entry with `"type": "service"` receives these environment variables:
 
 | Variable                    | Value                                                                                                                     |

@@ -32,6 +32,7 @@ const CachedCheckoutSchema = z.object({
   detached: z.boolean(),
   bare: z.boolean(),
   insideProject: z.boolean(),
+  paseoMetadata: z.boolean().default(false),
 });
 
 const CachedRepoSchema = z.object({
@@ -213,7 +214,7 @@ function toCachedRepo(repo: DiscoveredRepo): CachedCatalog["repos"][number] {
     rootPath: repo.rootPath,
     commonDir: repo.commonDir,
     commonDirHash: repo.commonDirHash,
-    checkouts: repo.checkouts,
+    checkouts: repo.checkouts.map((checkout) => ({ ...checkout })),
   };
 }
 
@@ -234,25 +235,15 @@ function mergeRepos(
       role: settings?.role ?? "normal",
       pinned: settings?.pinned ?? false,
       worktreeLocation: settings?.worktreeLocation ?? project.worktreeLocation ?? null,
-      checkouts: repo.checkouts.map((checkout) => ({
+      // Managed = Paseo may archive and delete it: the main checkout never, Paseo-created and
+      // adopted worktrees yes, anything else only after adoption.
+      checkouts: repo.checkouts.map(({ paseoMetadata, ...checkout }) => ({
         ...checkout,
         managed:
           checkout.isMain ||
-          adopted.some((entry) => areEquivalentPaths(entry, checkout.path)) ||
-          isUnderManagedRoot(checkout.path, repo, project),
+          paseoMetadata ||
+          adopted.some((entry) => areEquivalentPaths(entry, checkout.path)),
       })),
     };
   });
-}
-
-/** Paseo-created worktrees live under `<worktreesRoot>/<commonDirHash>/` or the sibling folder. */
-function isUnderManagedRoot(
-  checkoutPath: string,
-  repo: CachedCatalog["repos"][number],
-  project: PersistedProjectRecord,
-): boolean {
-  const sibling = path.join(project.rootPath, `${path.basename(repo.rootPath)}.wt`);
-  const relative = path.relative(sibling, checkoutPath);
-  if (relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative)) return true;
-  return checkoutPath.split(path.sep).includes(repo.commonDirHash);
 }

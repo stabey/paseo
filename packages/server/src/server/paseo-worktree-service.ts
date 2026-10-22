@@ -1,5 +1,5 @@
 import { stat } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 import type { WorkspaceGitService } from "./workspace-git-service.js";
 import { getRealpathAwareRelativePath } from "../utils/path.js";
@@ -138,6 +138,9 @@ async function createPaseoWorktreeWithPriority(
         teardownCwds: [],
         paseoHome: input.paseoHome,
         worktreesBaseRoot: input.worktreesRoot,
+        // The worktree was just created by us; its parent is the root to delete under even
+        // when it sits outside the managed worktrees root.
+        worktreesRoot: dirname(createdWorktree.worktree.worktreePath),
       },
       error,
     );

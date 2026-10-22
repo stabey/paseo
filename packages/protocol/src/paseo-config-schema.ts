@@ -49,6 +49,10 @@ export const PaseoWorktreeConfigRawSchema = z
     teardown: PaseoLifecycleCommandRawSchema.optional(),
     terminals: z.unknown().optional(),
     servicePorts: PaseoServicePortAllocationSchema.optional(),
+    // Checkout-relative paths copied into a new worktree before setup runs (.env, local certs).
+    include: z.array(z.string()).optional(),
+    // Checkout-relative directories symlinked from a new worktree back to the source checkout.
+    linkDirectories: z.array(z.string()).optional(),
   })
   .passthrough();
 

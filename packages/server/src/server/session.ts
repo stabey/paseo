@@ -170,6 +170,13 @@ import {
 import { wrapSpokenInput } from "./voice-config.js";
 import { isVoicePermissionAllowed } from "./voice-permission-policy.js";
 import type { ProjectRepoCatalog } from "./projects/project-repo-catalog.js";
+import { AdoptWorktreeError, adoptWorktree } from "./projects/adopt-worktree.js";
+import {
+  assertWorktreeSourceInProject,
+  resolveProjectForWorktreeSource,
+  resolveWorktreeDirectoryForProject,
+  WorktreeSourceOutsideProjectError,
+} from "./projects/worktree-placement.js";
 import {
   ProjectIconReader,
   removeProjectCustomIcon,
@@ -2471,6 +2478,8 @@ export class Session {
         return this.handleProjectReposRefreshRequest(msg);
       case "project.repos.settings.set.request":
         return this.handleProjectRepoSettingsSetRequest(msg);
+      case "project.repo.adopt_worktree.request":
+        return this.handleProjectRepoAdoptWorktreeRequest(msg);
       default:
         return undefined;
     }
@@ -3733,6 +3742,40 @@ export class Session {
         "Failed to handle project.repos.settings.set.request",
       );
       respond(false, error instanceof Error ? error.message : "Failed to save repo settings");
+    }
+  }
+
+  private async handleProjectRepoAdoptWorktreeRequest(
+    request: Extract<SessionInboundMessage, { type: "project.repo.adopt_worktree.request" }>,
+  ): Promise<void> {
+    const respond = (accepted: boolean, error: string | null) =>
+      this.emit({
+        type: "project.repo.adopt_worktree.response",
+        payload: { requestId: request.requestId, projectId: request.projectId, accepted, error },
+      });
+    try {
+      const project = await adoptWorktree(
+        {
+          projectRegistry: this.projectRegistry,
+          resolveDefaultBranch: (repoRoot) =>
+            this.workspaceGitService.resolveDefaultBranch(repoRoot),
+        },
+        request,
+      );
+      this.workspaceGitService.invalidateWorktrees();
+      // Workspaces already open in that worktree pick up ownership through their next snapshot.
+      void this.gitMutation.notifyGitMutation(request.worktreePath, "create-worktree");
+      if (this.projectRepoCatalog) await this.projectRepoCatalog.refresh(project);
+      await this.publishProjectUpdate({ kind: "upsert", project });
+      respond(true, null);
+    } catch (error) {
+      if (!(error instanceof AdoptWorktreeError)) {
+        this.sessionLogger.error(
+          { err: error },
+          "Failed to handle project.repo.adopt_worktree.request",
+        );
+      }
+      respond(false, error instanceof Error ? error.message : "Failed to adopt worktree");
     }
   }
 
@@ -6148,6 +6191,13 @@ export class Session {
         : {}),
       workspaceGitService: this.workspaceGitService,
       workspaceProvisioning: this.workspaceProvisioning,
+      resolveWorktreeDirectory: async (repoRoot) => {
+        const project = await resolveProjectForWorktreeSource(
+          { projectRegistry: this.projectRegistry, workspaceRegistry: this.workspaceRegistry },
+          { projectId: input.projectId, sourceCwd: input.cwd },
+        );
+        return project ? resolveWorktreeDirectoryForProject({ project, repoRoot }) : undefined;
+      },
     });
     void Promise.all([
       this.gitMutation.notifyGitMutation(input.cwd, "create-worktree"),
@@ -7031,6 +7081,9 @@ export class Session {
     }
 
     const sourceCwd = await resolveWorktreeSourceCwd(source, this.projectRegistry);
+    if (source.projectId && source.cwd) {
+      await this.assertWorktreeSourceBelongsToProject(source.projectId, sourceCwd);
+    }
 
     const result = await this.createPaseoWorktreeWorkflow(
       {
@@ -7059,6 +7112,30 @@ export class Session {
       request.firstAgentContext ? "running" : undefined,
     );
     return descriptor;
+  }
+
+  private async assertWorktreeSourceBelongsToProject(
+    projectId: string,
+    sourceCwd: string,
+  ): Promise<void> {
+    const project = await this.projectRegistry.get(projectId);
+    if (!project || project.archivedAt) {
+      throw new SessionRequestError("project_not_found", `Project not found: ${projectId}`);
+    }
+    const snapshot = this.projectRepoCatalog?.snapshot(project);
+    try {
+      assertWorktreeSourceInProject({
+        project,
+        sourceCwd,
+        knownCheckoutPaths:
+          snapshot?.repos.flatMap((repo) => repo.checkouts.map((checkout) => checkout.path)) ?? [],
+      });
+    } catch (error) {
+      if (error instanceof WorktreeSourceOutsideProjectError) {
+        throw new SessionRequestError("source_outside_project", error.message);
+      }
+      throw error;
+    }
   }
 
   private async handleOpenProjectRequest(

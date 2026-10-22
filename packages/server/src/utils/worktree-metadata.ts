@@ -12,11 +12,19 @@ const ChangeRequestLookupTargetSchema = z.object({
 // baseRefName is the display name; baseRef is the exact ref the worktree was cut from
 // ("refs/remotes/upstream/main"). baseRef is optional because worktrees written before it
 // existed only have the name — there are no migrations, so readers fall back.
+// Where Paseo put (or adopted) this worktree. Worktrees under the daemon's managed root are
+// owned by path shape alone; anywhere else, this record is the proof of ownership. It lives in
+// git's admin dir, so it survives everything short of `git worktree remove`.
+const PaseoWorktreePlacementSchema = z.object({
+  worktreesRoot: z.string().min(1),
+});
+
 const PaseoWorktreeMetadataV1Schema = z.object({
   version: z.literal(1),
   baseRefName: z.string().min(1),
   baseRef: z.string().min(1).optional(),
   changeRequestLookupTarget: ChangeRequestLookupTargetSchema.optional(),
+  placement: PaseoWorktreePlacementSchema.optional(),
 });
 
 const PaseoWorktreeMetadataV2Schema = z.object({
@@ -42,6 +50,7 @@ const PaseoWorktreeMetadataV2Schema = z.object({
       worktreePort: z.number().int().positive(),
     })
     .optional(),
+  placement: PaseoWorktreePlacementSchema.optional(),
 });
 
 const PaseoWorktreeMetadataSchema = z.union([
@@ -51,6 +60,7 @@ const PaseoWorktreeMetadataSchema = z.union([
 
 export type PaseoWorktreeMetadata = z.infer<typeof PaseoWorktreeMetadataSchema>;
 export type PaseoWorktreeChangeRequestHint = z.infer<typeof ChangeRequestLookupTargetSchema>;
+export type PaseoWorktreePlacement = z.infer<typeof PaseoWorktreePlacementSchema>;
 
 export function createPaseoWorktreeChangeRequestHint(
   input: PaseoWorktreeChangeRequestHint,
@@ -219,6 +229,7 @@ export function writePaseoWorktreeMetadata(
     baseRefName: string;
     baseRef?: string;
     changeRequestLookupTarget?: PaseoWorktreeChangeRequestHint;
+    placement?: PaseoWorktreePlacement;
   },
 ): void {
   const baseRefName = normalizeBaseRefName(options.baseRefName);
@@ -235,8 +246,44 @@ export function writePaseoWorktreeMetadata(
     ...(options.changeRequestLookupTarget
       ? { changeRequestLookupTarget: options.changeRequestLookupTarget }
       : {}),
+    ...(options.placement ? { placement: normalizePlacement(options.placement) } : {}),
   };
   writePaseoWorktreeMetadataFile(worktreeRoot, metadata);
+}
+
+function normalizePlacement(placement: PaseoWorktreePlacement): PaseoWorktreePlacement {
+  return { worktreesRoot: resolve(placement.worktreesRoot) };
+}
+
+/**
+ * Marks an existing worktree as Paseo-managed at its current location. Creates the metadata
+ * record when the worktree was not created by Paseo (adoption).
+ */
+export function writePaseoWorktreePlacementMetadata(
+  worktreeRoot: string,
+  options: { worktreesRoot: string; baseRefName: string },
+): void {
+  const current = readPaseoWorktreeMetadata(worktreeRoot);
+  if (!current) {
+    writePaseoWorktreeMetadata(worktreeRoot, {
+      baseRefName: options.baseRefName,
+      placement: { worktreesRoot: options.worktreesRoot },
+    });
+    return;
+  }
+  writePaseoWorktreeMetadataFile(worktreeRoot, {
+    ...current,
+    placement: normalizePlacement({ worktreesRoot: options.worktreesRoot }),
+  });
+}
+
+/** Placement recorded for a worktree, or null when there is none or the path is not a worktree. */
+export function readPaseoWorktreePlacement(worktreeRoot: string): PaseoWorktreePlacement | null {
+  try {
+    return readPaseoWorktreeMetadata(worktreeRoot)?.placement ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function writePaseoWorktreeRuntimeMetadata(

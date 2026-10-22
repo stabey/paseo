@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { runGitCommand } from "../../utils/run-git-command.js";
 import { deriveWorktreeProjectHash, getGitCommonDir } from "../../utils/worktree.js";
+import { readPaseoWorktreeMetadata } from "../../utils/worktree-metadata.js";
 import { areEquivalentPaths } from "../../utils/path.js";
 
 /**
@@ -49,7 +50,14 @@ export interface DiscoveredCheckout {
   bare: boolean;
   /** Whether the checkout lives under the project root. */
   insideProject: boolean;
+  /**
+   * Whether Paseo's metadata record exists for the checkout. Paseo writes it for every worktree
+   * it creates or adopts, wherever that worktree lives; plain `git worktree add` never does.
+   */
+  paseoMetadata: boolean;
 }
+
+export type ParsedCheckout = Omit<DiscoveredCheckout, "paseoMetadata">;
 
 export interface DiscoveredRepo {
   /** Path relative to the project root, `.` when the root itself is the repository. */
@@ -197,13 +205,30 @@ export async function listCheckouts(
     cwd: repoRoot,
     envOverlay: { GIT_OPTIONAL_LOCKS: "0" },
   });
-  return parseWorktreeList(stdout, projectRoot);
+  const checkouts: DiscoveredCheckout[] = [];
+  for (const checkout of parseWorktreeList(stdout, projectRoot)) {
+    checkouts.push(
+      Object.assign(checkout, {
+        paseoMetadata:
+          !checkout.isMain && !checkout.bare && hasPaseoWorktreeMetadata(checkout.path),
+      }),
+    );
+  }
+  return checkouts;
+}
+
+function hasPaseoWorktreeMetadata(worktreePath: string): boolean {
+  try {
+    return readPaseoWorktreeMetadata(worktreePath) !== null;
+  } catch {
+    return false;
+  }
 }
 
 /** Parses `git worktree list --porcelain`. Exported for tests. */
-export function parseWorktreeList(stdout: string, projectRoot: string): DiscoveredCheckout[] {
-  const checkouts: DiscoveredCheckout[] = [];
-  let current: Partial<DiscoveredCheckout> | null = null;
+export function parseWorktreeList(stdout: string, projectRoot: string): ParsedCheckout[] {
+  const checkouts: ParsedCheckout[] = [];
+  let current: Partial<ParsedCheckout> | null = null;
   const flush = () => {
     if (!current?.path) return;
     checkouts.push({

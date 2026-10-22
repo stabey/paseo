@@ -30,6 +30,17 @@ Workspace archive runs lifecycle teardown from the exact `cwd` but removes only 
 `worktreeRoot` after its last active reference disappears. Worktree recovery recreates that backing
 checkout from `mainRepoRoot`, then restores the relative path from `worktreeRoot` to `cwd`.
 
+Worktree ownership (whether Paseo may delete a worktree on archive) has two proofs. A path under
+`<worktreesRoot>/<hash>/<slug>` is owned by shape alone, because nothing else writes there. A
+worktree anywhere else is owned only when its metadata in git's admin dir
+(`.git/worktrees/<name>/paseo/worktree.json`) carries a `placement` record whose root is the
+worktree's parent. Paseo writes that record when a project's worktree location is `sibling`
+(`<repo parent>/<repo>.wt/<slug>`) or a chosen directory, and when a user-created worktree is
+adopted (`project.repo.adopt_worktree.request`). Plain `git worktree add` worktrees never get it,
+so the project repo catalog lists them as `managed: false` until adoption. The persisted workspace
+record stays the authority for archive: a `worktree` workspace with `isPaseoOwnedWorktree` deletes
+under the parent of its `worktreeRoot`, whichever kind of root that is.
+
 Paseo uses **file-based JSON persistence** instead of a traditional database. All data is validated at runtime with Zod schemas. Most stores write atomically (write to temp file, then rename); a few still use plain `writeFile` — see each section. There is no schema-versioning/migration framework — schemas rely on optional fields with defaults for forward compatibility, with a small amount of inline normalization in `persisted-config.ts` for legacy provider/speech entries.
 
 All server-side stores live under `$PASEO_HOME` (defaults to `~/.paseo`).

@@ -28,6 +28,8 @@ export interface CreateWorktreeCoreInput {
   firstAgentContext?: FirstAgentContext;
   paseoHome?: string;
   worktreesRoot?: string;
+  /** Explicit placement; otherwise `deps.resolveWorktreeDirectory` decides, then the managed root. */
+  worktreeDirectory?: string;
 }
 
 export interface CreateWorktreeCoreDeps {
@@ -37,6 +39,8 @@ export interface CreateWorktreeCoreDeps {
     "resolveRepoRoot" | "resolveDefaultBranch" | "resolveForge"
   >;
   resolveDefaultBranch?: (repoRoot: string) => Promise<string>;
+  /** Project-level worktree placement for the repository; undefined keeps the managed root. */
+  resolveWorktreeDirectory?: (repoRoot: string) => Promise<string | undefined>;
 }
 
 export interface CreateWorktreeCoreResult {
@@ -114,6 +118,8 @@ async function createWorktreeCoreWithPriority(
     }
   }
 
+  const worktreeDirectory =
+    input.worktreeDirectory ?? (await deps.resolveWorktreeDirectory?.(repoRoot));
   return {
     worktree: await createWorktree({
       cwd: repoRoot,
@@ -121,6 +127,7 @@ async function createWorktreeCoreWithPriority(
       source: intent,
       paseoHome: input.paseoHome,
       worktreesRoot: input.worktreesRoot,
+      ...(worktreeDirectory ? { worktreeDirectory } : {}),
     }),
     intent,
     repoRoot,

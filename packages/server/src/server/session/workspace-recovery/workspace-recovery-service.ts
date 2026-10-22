@@ -1,11 +1,15 @@
 import { randomUUID } from "node:crypto";
-import { basename } from "node:path";
+import { basename, dirname } from "node:path";
 
 import { resolveRepositoryDefaultBranch } from "../../../utils/checkout-git.js";
-import { createRealpathAwarePathMatcher } from "../../../utils/path.js";
+import {
+  createRealpathAwarePathMatcher,
+  getRealpathAwareRelativePath,
+} from "../../../utils/path.js";
 import { runGitCommand } from "../../../utils/run-git-command.js";
 import {
   createWorktree,
+  getPaseoWorktreesRoot,
   isPaseoOwnedWorktreeCwd,
   mapWorkspaceCwdToWorktree,
   rollbackCreatedPaseoWorktree,
@@ -187,6 +191,11 @@ export function createWorkspaceRecoveryService(deps: {
 
         paseoHome: deps.paseoHome,
         worktreesRoot: deps.worktreesRoot,
+        // Recreate the worktree where it lived. Managed worktrees resolve to the same hash
+        // root; placed ones (sibling folder, chosen directory) go back to their parent.
+        ...((await isUnderManagedWorktreesRoot(previousWorktreePath, sourceRepoRoot, deps))
+          ? {}
+          : { worktreeDirectory: dirname(previousWorktreePath) }),
       });
       recreatedWorktreePath = result.worktreePath;
     } catch (error) {
@@ -275,4 +284,17 @@ function createRecoveryPlan(
     },
     workspace: input.workspace,
   };
+}
+
+async function isUnderManagedWorktreesRoot(
+  worktreePath: string,
+  sourceRepoRoot: string,
+  options: { paseoHome: string; worktreesRoot?: string },
+): Promise<boolean> {
+  const managedRoot = await getPaseoWorktreesRoot(
+    sourceRepoRoot,
+    options.paseoHome,
+    options.worktreesRoot,
+  );
+  return getRealpathAwareRelativePath(managedRoot, worktreePath) !== null;
 }
