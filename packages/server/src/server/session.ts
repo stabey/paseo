@@ -169,6 +169,7 @@ import {
 } from "./workspace-registry.js";
 import { wrapSpokenInput } from "./voice-config.js";
 import { isVoicePermissionAllowed } from "./voice-permission-policy.js";
+import type { ProjectRepoCatalog } from "./projects/project-repo-catalog.js";
 import {
   ProjectIconReader,
   removeProjectCustomIcon,
@@ -472,6 +473,7 @@ export interface SessionOptions {
   creationService: Pick<CreationService, "create" | "subscribe">;
   projectRegistry: ProjectRegistry;
   workspaceRegistry: WorkspaceRegistry;
+  projectRepoCatalog?: ProjectRepoCatalog;
   directorySync?: DirectorySyncService;
   workspaceLabelService?: WorkspaceLabelService;
   filesystem?: SessionFileSystem;
@@ -740,6 +742,7 @@ export class Session {
   private readonly sessionLogger: pino.Logger;
   private readonly paseoHome: string;
   private readonly projectIcons: ProjectIconReader;
+  private readonly projectRepoCatalog: ProjectRepoCatalog | undefined;
   private readonly worktreesRoot: string | undefined;
   private readonly rewindInitiators = new Map<string, object | undefined>();
 
@@ -912,6 +915,7 @@ export class Session {
     this.agentMessages = options.agentMessages;
     this.creationService = options.creationService;
     this.projectIcons = new ProjectIconReader(paseoHome);
+    this.projectRepoCatalog = options.projectRepoCatalog;
     this.worktreesRoot = worktreesRoot;
     this.pluginRuntime = pluginRuntime;
     this.orchestrationSkills = orchestrationSkills;
@@ -2456,8 +2460,20 @@ export class Session {
       this.dispatchWorkspaceStateMessage(msg) ??
       this.dispatchWorkspaceLabelMessage(msg) ??
       this.dispatchWorkspaceSetupMessage(msg) ??
+      this.dispatchProjectRepoMessage(msg) ??
       this.dispatchWorkspaceAndProjectMessage(msg)
     );
+  }
+
+  private dispatchProjectRepoMessage(msg: SessionInboundMessage): Promise<void> | undefined {
+    switch (msg.type) {
+      case "project.repos.refresh.request":
+        return this.handleProjectReposRefreshRequest(msg);
+      case "project.repos.settings.set.request":
+        return this.handleProjectRepoSettingsSetRequest(msg);
+      default:
+        return undefined;
+    }
   }
 
   private dispatchOrchestrationSkillsMessage(
@@ -3656,6 +3672,67 @@ export class Session {
           error: getErrorMessageOr(error, "Failed to update agent"),
         },
       });
+    }
+  }
+
+  private async handleProjectReposRefreshRequest(
+    request: Extract<SessionInboundMessage, { type: "project.repos.refresh.request" }>,
+  ): Promise<void> {
+    const respond = (accepted: boolean, error: string | null) =>
+      this.emit({
+        type: "project.repos.refresh.response",
+        payload: { requestId: request.requestId, projectId: request.projectId, accepted, error },
+      });
+    try {
+      const project = await this.projectRegistry.get(request.projectId);
+      if (!project || project.archivedAt) return respond(false, "Project not found");
+      if (!this.projectRepoCatalog) return respond(false, "Repository discovery unavailable");
+      await this.projectRepoCatalog.refresh(project);
+      // The catalog only pushes when the tree changed; an explicit refresh always re-sends.
+      await this.publishProjectUpdate({ kind: "upsert", project });
+      respond(true, null);
+    } catch (error) {
+      this.sessionLogger.error({ err: error }, "Failed to handle project.repos.refresh.request");
+      respond(false, error instanceof Error ? error.message : "Repository scan failed");
+    }
+  }
+
+  private async handleProjectRepoSettingsSetRequest(
+    request: Extract<SessionInboundMessage, { type: "project.repos.settings.set.request" }>,
+  ): Promise<void> {
+    const respond = (accepted: boolean, error: string | null) =>
+      this.emit({
+        type: "project.repos.settings.set.response",
+        payload: { requestId: request.requestId, projectId: request.projectId, accepted, error },
+      });
+    try {
+      const updated = await this.projectRegistry.update(request.projectId, (project) => {
+        const existing = project.repos.find((repo) => repo.relPath === request.relPath);
+        const next = {
+          relPath: request.relPath,
+          commonDirHash: existing?.commonDirHash ?? null,
+          role: request.role ?? existing?.role ?? "normal",
+          pinned: request.pinned ?? existing?.pinned ?? false,
+          worktreeLocation:
+            request.worktreeLocation === undefined
+              ? (existing?.worktreeLocation ?? null)
+              : request.worktreeLocation,
+          adoptedWorktrees: existing?.adoptedWorktrees ?? [],
+        };
+        return {
+          ...project,
+          repos: [...project.repos.filter((repo) => repo.relPath !== request.relPath), next],
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      if (!updated || updated.archivedAt) return respond(false, "Project not found");
+      respond(true, null);
+    } catch (error) {
+      this.sessionLogger.error(
+        { err: error },
+        "Failed to handle project.repos.settings.set.request",
+      );
+      respond(false, error instanceof Error ? error.message : "Failed to save repo settings");
     }
   }
 
@@ -6007,6 +6084,7 @@ export class Session {
     project: PersistedProjectRecord,
   ): Promise<WorkspaceProjectDescriptorPayload> {
     const icon = await this.projectIcons.snapshot(project);
+    const repos = this.projectRepoCatalog?.snapshot(project);
     return {
       projectId: project.projectId,
       ...(project.projectKey ? { projectKey: project.projectKey } : {}),
@@ -6016,6 +6094,7 @@ export class Session {
       projectIconRevision: icon.revision,
       projectRootPath: project.rootPath,
       projectKind: project.kind,
+      ...(repos ? { repos: repos.repos, reposScannedAt: repos.scannedAt } : {}),
     };
   }
 

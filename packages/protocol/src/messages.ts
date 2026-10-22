@@ -983,6 +983,31 @@ export const ProjectRenameRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const ProjectRepoRoleSchema = z.enum(["normal", "reference", "hidden"]);
+export const ProjectRepoWorktreeLocationSchema = z.union([
+  z.literal("managed"),
+  z.literal("sibling"),
+  z.object({ kind: z.literal("directory"), path: z.string() }),
+]);
+
+/** Re-scan the project folder for repositories and their checkouts. */
+export const ProjectReposRefreshRequestSchema = z.object({
+  type: z.literal("project.repos.refresh.request"),
+  projectId: z.string(),
+  requestId: z.string(),
+});
+
+/** Persist per-repository settings. Omitted fields keep their value. */
+export const ProjectRepoSettingsSetRequestSchema = z.object({
+  type: z.literal("project.repos.settings.set.request"),
+  projectId: z.string(),
+  relPath: z.string(),
+  role: ProjectRepoRoleSchema.optional(),
+  pinned: z.boolean().optional(),
+  worktreeLocation: ProjectRepoWorktreeLocationSchema.nullable().optional(),
+  requestId: z.string(),
+});
+
 export const ProjectIconSetRequestSchema = z.object({
   type: z.literal("project.icon.set.request"),
   projectId: z.string(),
@@ -2087,6 +2112,23 @@ export const ProjectRenameResponsePayloadSchema = z.object({
 export const ProjectRenameResponseSchema = z.object({
   type: z.literal("project.rename.response"),
   payload: ProjectRenameResponsePayloadSchema,
+});
+
+export const ProjectReposResponsePayloadSchema = z.object({
+  requestId: z.string(),
+  projectId: z.string(),
+  accepted: z.boolean(),
+  error: z.string().nullable(),
+});
+
+export const ProjectReposRefreshResponseSchema = z.object({
+  type: z.literal("project.repos.refresh.response"),
+  payload: ProjectReposResponsePayloadSchema,
+});
+
+export const ProjectRepoSettingsSetResponseSchema = z.object({
+  type: z.literal("project.repos.settings.set.response"),
+  payload: ProjectReposResponsePayloadSchema,
 });
 
 export const ProjectIconSetResponseSchema = z.object({
@@ -3272,6 +3314,8 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   CloseItemsRequestMessageSchema,
   UpdateAgentRequestMessageSchema,
   ProjectRenameRequestSchema,
+  ProjectReposRefreshRequestSchema,
+  ProjectRepoSettingsSetRequestSchema,
   ProjectIconSetRequestSchema,
   ProjectRemoveRequestSchema,
   WorkspaceTitleSetRequestSchema,
@@ -3683,6 +3727,8 @@ export const ServerInfoStatusPayloadSchema = z
         // COMPAT(daemonConfigReload): added in v0.4.0, remove gate after 2027-02-14.
         daemonConfigReload: z.boolean().optional(),
         projectSearchRoots: z.boolean().optional(),
+        // Project folders expose discovered repositories and per-repo settings.
+        projectRepos: z.boolean().optional(),
         // COMPAT(relayConfig): added in v0.2.6, remove gate after 2027-01-31.
         relayConfig: z.boolean().optional(),
         // COMPAT(pushTokenRevocation): added in v0.3.2, remove gate after 2027-02-10.
@@ -4289,6 +4335,29 @@ export const FetchRecentProviderSessionsResponseMessageSchema = z.object({
 // A project parent that has zero active workspaces. The sidebar renders the
 // project row with a new-workspace child so projects persist after their last
 // workspace is archived.
+export const ProjectRepoCheckoutPayloadSchema = z.object({
+  path: z.string(),
+  branch: z.string().nullable(),
+  head: z.string().nullable(),
+  isMain: z.boolean(),
+  detached: z.boolean(),
+  bare: z.boolean(),
+  insideProject: z.boolean(),
+  /** Created by Paseo, or an external worktree the user adopted. */
+  managed: z.boolean(),
+});
+
+export const ProjectRepoPayloadSchema = z.object({
+  /** Relative to the project root; `.` when the root itself is the repository. */
+  relPath: z.string(),
+  rootPath: z.string(),
+  commonDirHash: z.string(),
+  role: ProjectRepoRoleSchema,
+  pinned: z.boolean(),
+  worktreeLocation: ProjectRepoWorktreeLocationSchema.nullable(),
+  checkouts: z.array(ProjectRepoCheckoutPayloadSchema),
+});
+
 export const WorkspaceProjectDescriptorPayloadSchema = z.object({
   projectId: z.string(),
   // COMPAT(projectKey): added in v0.2.4 on 2026-07-28; remove optional after 2027-01-28.
@@ -4303,6 +4372,10 @@ export const WorkspaceProjectDescriptorPayloadSchema = z.object({
   projectIconRevision: z.string().optional(),
   projectRootPath: z.string(),
   projectKind: z.enum(["git", "non_git", "directory"]),
+  // Repositories discovered inside the project folder and their checkouts. Omitted until the
+  // daemon has scanned the folder; old daemons never send it.
+  repos: z.array(ProjectRepoPayloadSchema).optional(),
+  reposScannedAt: z.string().optional(),
   // COMPAT(directorySync): sequence of this latest directory projection.
   syncSeq: z.number().int().positive().optional(),
 });
@@ -7075,6 +7148,8 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   AgentRewindResponseMessageSchema,
   UpdateAgentResponseMessageSchema,
   ProjectRenameResponseSchema,
+  ProjectReposRefreshResponseSchema,
+  ProjectRepoSettingsSetResponseSchema,
   ProjectIconSetResponseSchema,
   ProjectRemoveResponseSchema,
   WorkspaceTitleSetResponseSchema,
@@ -7276,6 +7351,8 @@ export type AgentDetachResponseMessage = z.infer<typeof AgentDetachResponseMessa
 export type AgentRewindResponseMessage = z.infer<typeof AgentRewindResponseMessageSchema>;
 export type UpdateAgentResponseMessage = z.infer<typeof UpdateAgentResponseMessageSchema>;
 export type ProjectRenameResponse = z.infer<typeof ProjectRenameResponseSchema>;
+export type ProjectReposRefreshResponse = z.infer<typeof ProjectReposRefreshResponseSchema>;
+export type ProjectRepoSettingsSetResponse = z.infer<typeof ProjectRepoSettingsSetResponseSchema>;
 export type ProjectIconSetResponse = z.infer<typeof ProjectIconSetResponseSchema>;
 export type ProjectRemoveResponse = z.infer<typeof ProjectRemoveResponseSchema>;
 export type WorkspaceTitleSetResponse = z.infer<typeof WorkspaceTitleSetResponseSchema>;
@@ -7430,6 +7507,12 @@ export type DeleteAgentRequestMessage = z.infer<typeof DeleteAgentRequestMessage
 export type UpdateAgentRequestMessage = z.infer<typeof UpdateAgentRequestMessageSchema>;
 export type ProjectIconSource = z.infer<typeof ProjectIconSourceSchema>;
 export type ProjectRenameRequest = z.infer<typeof ProjectRenameRequestSchema>;
+export type ProjectReposRefreshRequest = z.infer<typeof ProjectReposRefreshRequestSchema>;
+export type ProjectRepoSettingsSetRequest = z.infer<typeof ProjectRepoSettingsSetRequestSchema>;
+export type ProjectRepoRole = z.infer<typeof ProjectRepoRoleSchema>;
+export type ProjectRepoWorktreeLocation = z.infer<typeof ProjectRepoWorktreeLocationSchema>;
+export type ProjectRepoPayload = z.infer<typeof ProjectRepoPayloadSchema>;
+export type ProjectRepoCheckoutPayload = z.infer<typeof ProjectRepoCheckoutPayloadSchema>;
 export type ProjectIconSetRequest = z.infer<typeof ProjectIconSetRequestSchema>;
 export type ProjectRemoveRequest = z.infer<typeof ProjectRemoveRequestSchema>;
 export type WorkspaceTitleSetRequest = z.infer<typeof WorkspaceTitleSetRequestSchema>;

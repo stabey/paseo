@@ -20,11 +20,34 @@ const UntrustedWorkspaceSourceSchema = z.object({
   headRepository: z.string(),
 });
 
+export const PersistedProjectRepoWorktreeLocationSchema = z.union([
+  z.literal("managed"),
+  z.literal("sibling"),
+  z.object({ kind: z.literal("directory"), path: z.string() }),
+]);
+
+// User settings for one repository inside a project folder, keyed by its path relative to the
+// project root. Discovery supplies everything else; these fields only override it.
+export const PersistedProjectRepoSettingsSchema = z.object({
+  relPath: z.string(),
+  commonDirHash: z.string().nullable().default(null),
+  role: z.enum(["normal", "reference", "hidden"]).default("normal"),
+  pinned: z.boolean().default(false),
+  worktreeLocation: PersistedProjectRepoWorktreeLocationSchema.nullable().default(null),
+  // External worktrees the user chose to manage; absolute paths.
+  adoptedWorktrees: z.array(z.string()).default([]),
+});
+
 const PersistedProjectRecordSchema = z.object({
   projectId: z.string(),
   rootPath: z.string(),
   kind: z.enum(["git", "non_git"]),
   displayName: z.string(),
+  // Where new worktrees of this project's repositories go unless a repo overrides it.
+  worktreeLocation: PersistedProjectRepoWorktreeLocationSchema.nullable()
+    .optional()
+    .transform((value) => value ?? null),
+  repos: z.array(PersistedProjectRepoSettingsSchema).optional().default([]),
   // COMPAT(projectKey): added in v0.2.4 on 2026-07-28; remove optional after 2027-01-28.
   projectKey: z
     .string()
@@ -109,6 +132,10 @@ const PersistedWorkspaceRecordSchema = z.object({
 });
 
 export type PersistedProjectRecord = z.infer<typeof PersistedProjectRecordSchema>;
+export type PersistedProjectRepoSettings = z.infer<typeof PersistedProjectRepoSettingsSchema>;
+export type PersistedProjectRepoWorktreeLocation = z.infer<
+  typeof PersistedProjectRepoWorktreeLocationSchema
+>;
 export type PersistedWorkspaceRecord = z.infer<typeof PersistedWorkspaceRecordSchema>;
 
 export interface WorkspaceMutation {

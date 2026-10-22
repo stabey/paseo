@@ -144,6 +144,7 @@ import type { PaseoToolRuntimeContext } from "./agent/tools/types.js";
 import { createAgentProviderRuntime } from "./agent/provider-runtime.js";
 import { bootstrapWorkspaceRegistries } from "./workspace-registry-bootstrap.js";
 import { WorkspaceReconciliationService } from "./workspace-reconciliation-service.js";
+import { ProjectRepoCatalog } from "./projects/project-repo-catalog.js";
 import {
   FileBackedProjectRegistry,
   FileBackedWorkspaceRegistry,
@@ -996,6 +997,14 @@ export async function createPaseoDaemon(
     scriptRuntimeStore.removeForWorkspace(workspaceId);
     releaseWorkspaceServicePortPlan(workspaceId);
   };
+  const projectRepoCatalog = new ProjectRepoCatalog({
+    paseoHome: config.paseoHome,
+    worktreesRoot: config.worktreesRoot,
+    projectRegistry,
+    logger,
+    onChanged: (project) => wsServer?.publishProjectUpdate({ kind: "upsert", project }),
+  });
+  await projectRepoCatalog.start();
   const workspaceReconciliation = new WorkspaceReconciliationService({
     serverId,
     projectRegistry,
@@ -1766,6 +1775,7 @@ export async function createPaseoDaemon(
               pluginRuntime,
               orchestrationSkills,
               workspaceLabelService,
+              projectRepoCatalog,
             );
             pluginRuntime.bindPaseoSessionHost(wsServer);
             await pluginRuntime.start();
@@ -1838,6 +1848,7 @@ export async function createPaseoDaemon(
     unsubscribePluginProviders();
     await hubRelationships.stop();
     workspaceReconciliation.dispose();
+    projectRepoCatalog.dispose();
     scriptHealthMonitor.stop();
     // Freeze both ingress and registration before taking the agent closure snapshot.
     wsServer?.prepareForShutdown();
