@@ -175,6 +175,11 @@ export function useForkAgent(
       const draftId = await prepareForkDraft();
       const sourceDirectory =
         agent.projectPlacement?.checkout?.cwd?.trim() || agent.cwd.trim() || undefined;
+      // The route wants the host's project id. Placement only carries the cross-host projectKey,
+      // so read the id off the agent's workspace record instead.
+      const projectId = workspaceId
+        ? useSessionStore.getState().sessions[serverId]?.workspaces.get(workspaceId)?.projectId
+        : undefined;
       if (draftSetup) {
         useWorkspaceDraftSubmissionStore.getState().setDraftSetup({
           draftId,
@@ -187,7 +192,7 @@ export function useForkAgent(
           serverId,
           sourceDirectory,
           displayName: agent.projectPlacement?.projectName,
-          projectId: agent.projectPlacement?.projectKey,
+          projectId,
           draftId,
         }),
       );

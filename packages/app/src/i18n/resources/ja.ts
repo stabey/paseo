@@ -1359,6 +1359,7 @@ export const ja: TranslationResources = {
       label: "分離方法",
     },
     fields: {
+      repo: "リポジトリ",
       project: "プロジェクト",
       branch: "ブランチ",
       baseNotApplicable: "該当なし",
@@ -1372,6 +1373,7 @@ export const ja: TranslationResources = {
       selectModel: "モデルを選択してください",
     },
     tooltips: {
+      repo: "プロジェクト内のリポジトリを選択",
       project: "Choose the project",
       host: "Choose the host",
       isolation: "Choose the isolation level",

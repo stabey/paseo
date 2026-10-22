@@ -1375,6 +1375,7 @@ export const fr: TranslationResources = {
       label: "Isolation",
     },
     fields: {
+      repo: "Dépôt",
       project: "Projet",
       branch: "Branche",
       baseNotApplicable: "Non applicable",
@@ -1388,6 +1389,7 @@ export const fr: TranslationResources = {
       selectModel: "Sélectionnez un modèle",
     },
     tooltips: {
+      repo: "Choisir le dépôt du projet",
       project: "Choisir le projet",
       host: "Choisir l’hôte",
       isolation: "Choisir le niveau d’isolation",

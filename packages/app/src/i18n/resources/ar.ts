@@ -1345,6 +1345,7 @@ export const ar: TranslationResources = {
       label: "العزل",
     },
     fields: {
+      repo: "المستودع",
       project: "المشروع",
       branch: "الفرع",
       baseNotApplicable: "غير قابل للتطبيق",
@@ -1358,6 +1359,7 @@ export const ar: TranslationResources = {
       selectModel: "اختر نموذجا",
     },
     tooltips: {
+      repo: "اختر المستودع داخل المشروع",
       project: "Choose the project",
       host: "Choose the host",
       isolation: "Choose the isolation level",

@@ -1352,6 +1352,7 @@ export const ko: TranslationResources = {
       label: "격리",
     },
     fields: {
+      repo: "저장소",
       project: "프로젝트",
       branch: "브랜치",
       baseNotApplicable: "해당 없음",
@@ -1365,6 +1366,7 @@ export const ko: TranslationResources = {
       selectModel: "모델을 선택하세요",
     },
     tooltips: {
+      repo: "프로젝트의 저장소 선택",
       project: "Choose the project",
       host: "Choose the host",
       isolation: "Choose the isolation level",

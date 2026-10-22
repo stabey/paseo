@@ -1363,6 +1363,7 @@ export const ru: TranslationResources = {
       label: "Изоляция",
     },
     fields: {
+      repo: "Репозиторий",
       project: "Проект",
       branch: "Ветка",
       baseNotApplicable: "Неприменимо",
@@ -1376,6 +1377,7 @@ export const ru: TranslationResources = {
       selectModel: "Выберите модель",
     },
     tooltips: {
+      repo: "Выберите репозиторий проекта",
       project: "Выберите проект",
       host: "Выберите хост",
       isolation: "Выберите уровень изоляции",

@@ -1353,6 +1353,7 @@ export const en = {
       label: "Isolation",
     },
     fields: {
+      repo: "Repository",
       project: "Project",
       branch: "Branch",
       baseNotApplicable: "Not applicable",
@@ -1366,6 +1367,7 @@ export const en = {
       selectModel: "Select a model",
     },
     tooltips: {
+      repo: "Choose the repository in this project",
       project: "Choose the project",
       host: "Choose the host",
       isolation: "Choose the isolation level",

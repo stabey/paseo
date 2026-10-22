@@ -16,7 +16,7 @@ import {
   FieldTrigger,
   type FieldTriggerVariant,
 } from "./field-trigger";
-import { branchIcon, folderIcon, ProjectIcon, pullRequestIcon } from "./icons";
+import { repoIcon, branchIcon, folderIcon, ProjectIcon, pullRequestIcon } from "./icons";
 import { LaunchControl } from "./launch-control";
 import { AddProjectOption, IsolationOption, ProjectOption, RefOption } from "./options";
 
@@ -45,6 +45,14 @@ export interface NewWorkspaceFormProps {
     supportsWorkspaceMultiplicity: boolean;
     onSelect: (id: string) => void;
     onAddProject: () => void;
+  };
+  /** Multi-repository projects: which repository the workspace is cut from. */
+  repo: PickerControl & {
+    visible: boolean;
+    options: ComboboxOption[];
+    selectedOptionId: string;
+    triggerLabel: string;
+    onSelect: (id: string) => void;
   };
   host: PickerControl & {
     allHosts: HostProfile[];
@@ -165,7 +173,7 @@ function useRefRenderOption(itemById: Map<string, PickerItem>, isPending: boolea
  */
 export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement {
   const { t } = useTranslation();
-  const { isCompact, isPending, project, host, isolation, base, launch } = props;
+  const { isCompact, isPending, project, repo, host, isolation, base, launch } = props;
   const variant: FieldTriggerVariant = isCompact ? "field" : "badge";
   const projectPicker = useProjectPicker(project, isPending);
   const isolationPicker = useIsolationPicker(isolation, isPending);
@@ -214,6 +222,20 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
       testID="new-workspace-project-picker-trigger"
     />
   );
+  const repoField = repo.visible ? (
+    <FieldTrigger
+      ref={repo.anchorRef}
+      variant={variant}
+      label={t("newWorkspace.fields.repo")}
+      accessibilityLabel="Workspace repository"
+      tooltip={t("newWorkspace.tooltips.repo")}
+      icon={repoIcon}
+      value={repo.triggerLabel}
+      onPress={repo.open}
+      disabled={isPending}
+      testID="new-workspace-repo-picker-trigger"
+    />
+  ) : null;
   const hostField = (
     <HostPicker
       hosts={host.allHosts}
@@ -302,6 +324,19 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
         footer={projectPicker.footer}
       />
       <Combobox
+        options={repo.options}
+        value={repo.selectedOptionId}
+        onSelect={repo.onSelect}
+        searchable
+        searchPlaceholder={t("newWorkspace.fields.repo")}
+        title={t("newWorkspace.fields.repo")}
+        open={repo.openState}
+        onOpenChange={repo.onOpenChange}
+        desktopPlacement="bottom-start"
+        desktopMinWidth={280}
+        anchorRef={repo.anchorRef}
+      />
+      <Combobox
         options={isolationPicker.options}
         value={isolation.effectiveIsolation}
         onSelect={isolationPicker.onSelect}
@@ -334,6 +369,7 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
     return (
       <View testID="new-workspace-ref-picker-row" style={styles.compactStack}>
         {projectField}
+        {repoField}
         {hostField}
         {isolationField}
         {baseField}
@@ -350,6 +386,7 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
   return (
     <View testID="new-workspace-ref-picker-row" style={styles.desktopRow} pointerEvents="box-none">
       <View style={styles.desktopControl}>{projectField}</View>
+      {repoField ? <View style={styles.desktopControl}>{repoField}</View> : null}
       <View style={styles.desktopControl}>{hostField}</View>
       {isolationField ? <View style={styles.desktopControl}>{isolationField}</View> : null}
       {baseField ? <View style={styles.desktopControl}>{baseField}</View> : null}

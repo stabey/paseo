@@ -1371,6 +1371,7 @@ export const ptBR: TranslationResources = {
       label: "Isolamento",
     },
     fields: {
+      repo: "Repositório",
       project: "Projeto",
       branch: "Branch",
       baseNotApplicable: "Não aplicável",
@@ -1384,6 +1385,7 @@ export const ptBR: TranslationResources = {
       selectModel: "Selecione um modelo",
     },
     tooltips: {
+      repo: "Escolha o repositório do projeto",
       project: "Choose the project",
       host: "Choose the host",
       isolation: "Choose the isolation level",

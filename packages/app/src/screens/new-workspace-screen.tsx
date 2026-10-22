@@ -108,6 +108,7 @@ import {
 } from "./new-workspace-initial-context";
 import { buildNewWorkspaceProjectIconTargets } from "./new-workspace/project-icon-targets";
 import { useNewWorkspaceProjectPicker } from "./new-workspace/project-picker";
+import { useNewWorkspaceRepoField } from "./new-workspace/repo-field";
 import { useNewWorkspaceForm } from "./new-workspace/form";
 import { ImportSessionButton } from "./new-workspace/import-session-button";
 import { useImportSession } from "@/hooks/use-import-session";
@@ -273,6 +274,17 @@ interface WorkspaceDraftSubmissionConfig {
   thinkingOptionId: string | null;
   featureValues: Record<string, unknown> | undefined;
   target: WorkspaceTabTarget;
+}
+
+/** A reported repository is a git checkout even when the project folder itself is not. */
+function resolveWorktreeSupport(input: {
+  hasRepos: boolean;
+  project: HostProjectListItem | null;
+  serverId: string;
+}): ReturnType<typeof getWorktreeSupportForHostProject> {
+  if (input.hasRepos) return "supported";
+  if (!input.project) return "unsupported";
+  return getWorktreeSupportForHostProject({ project: input.project, serverId: input.serverId });
 }
 
 interface WorkspaceCreationResult {
@@ -961,7 +973,7 @@ export function NewWorkspaceScreen({
   const isConnected = useHostRuntimeIsConnected(selectedServerId);
   const {
     selectedProject,
-    selectedSourceDirectory,
+    selectedSourceDirectory: projectSourceDirectory,
     projectPickerOptions,
     projectByOptionId,
     selectedProjectOptionId,
@@ -975,6 +987,13 @@ export function NewWorkspaceScreen({
     lastActiveProject,
     allowAllProjects: supportsWorkspaceMultiplicity,
   });
+  const repoField = useNewWorkspaceRepoField({
+    selectedServerId,
+    selectedProject,
+    preferredDirectory: sourceDirectoryProp,
+  });
+  // A multi-repository project cuts the workspace from the chosen repository's main checkout.
+  const selectedSourceDirectory = repoField.sourceDirectory ?? projectSourceDirectory;
   const projectIconTargets = useMemo(
     () => buildNewWorkspaceProjectIconTargets(projects, selectedServerId),
     [projects, selectedServerId],
@@ -1034,9 +1053,11 @@ export function NewWorkspaceScreen({
     cwd: selectedSourceDirectory ?? "",
   });
 
-  const worktreeSupport = selectedProject
-    ? getWorktreeSupportForHostProject({ project: selectedProject, serverId: selectedServerId })
-    : "unsupported";
+  const worktreeSupport = resolveWorktreeSupport({
+    hasRepos: repoField.hasRepos,
+    project: selectedProject,
+    serverId: selectedServerId,
+  });
   const isPending = isNewWorkspacePending({ pendingAction, isDraftHandoffActive });
   const { effectiveIsolation, setIsolation, canCreateWorktree, showRefPicker } =
     useWorkspaceIsolation({
@@ -1476,6 +1497,7 @@ export function NewWorkspaceScreen({
       onSelect: handleSelectProjectOption,
       onAddProject: handleAddProject,
     },
+    repo: repoField.formProps,
     host: {
       anchorRef: hostPickerAnchorRef,
       open: openHostPicker,

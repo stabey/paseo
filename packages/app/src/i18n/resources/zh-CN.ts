@@ -1334,6 +1334,7 @@ export const zhCN: TranslationResources = {
       label: "隔离",
     },
     fields: {
+      repo: "仓库",
       project: "项目",
       branch: "分支",
       baseNotApplicable: "不适用",
@@ -1347,6 +1348,7 @@ export const zhCN: TranslationResources = {
       selectModel: "请选择模型",
     },
     tooltips: {
+      repo: "选择项目中的仓库",
       project: "Choose the project",
       host: "Choose the host",
       isolation: "Choose the isolation level",
