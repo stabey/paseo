@@ -410,7 +410,7 @@ async function maybeRemoveDirectory(
       paseoHome: dependencies.paseoHome,
       worktreesBaseRoot: dependencies.paseoWorktreesBaseRoot,
     });
-    dependencies.workspaceGitService.invalidateWorktrees();
+    dependencies.workspaceGitService.invalidateWorktrees(backing.mainRepoRoot ?? undefined);
     dependencies.github.invalidate({ cwd: backing.path });
     return true;
   } catch (error) {

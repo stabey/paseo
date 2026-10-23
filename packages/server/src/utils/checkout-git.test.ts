@@ -46,6 +46,8 @@ import {
   isPaseoWorktreePath,
   isDescendantPath,
   warmCheckoutShortstatInBackground,
+  assertWorkingTreeClean,
+  UncommittedChangesError,
 } from "./checkout-git.js";
 import { startGitCommandMetrics, stopGitCommandMetrics } from "./run-git-command.js";
 import { createForgeResolver } from "../services/forge-resolver.js";
@@ -4062,6 +4064,19 @@ const x = 1;
     it("is case insensitive on Windows paths", () => {
       expect(isDescendantPath("c:\\repo\\child", "C:\\repo")).toBe(true);
     });
+  });
+});
+
+describe("assertWorkingTreeClean", () => {
+  it("passes a clean checkout and rejects one with an untracked file", async () => {
+    const { tempDir, repoDir } = initRepo();
+    try {
+      await assertWorkingTreeClean(repoDir);
+      writeFileSync(join(repoDir, "scratch.txt"), "scratch\n");
+      await expect(assertWorkingTreeClean(repoDir)).rejects.toBeInstanceOf(UncommittedChangesError);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });
 

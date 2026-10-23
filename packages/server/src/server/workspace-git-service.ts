@@ -241,7 +241,11 @@ export interface WorkspaceGitService {
     cwdOrRepoRoot: string,
     options?: WorkspaceGitReadOptions,
   ): Promise<WorkspaceGitWorktreeInfo[]>;
-  invalidateWorktrees(): void;
+  /**
+   * Drop cached worktree lists after `git worktree add/remove`. Pass the main repository root
+   * when known so listeners can limit their rescan to it.
+   */
+  invalidateWorktrees(repoRoot?: string): void;
   getProjectSlug(cwd: string, options?: WorkspaceGitReadOptions): Promise<string>;
   resolveRepoRoot(cwd: string, options?: WorkspaceGitReadOptions): Promise<string>;
   resolveDefaultBranch(cwdOrRepoRoot: string, options?: WorkspaceGitReadOptions): Promise<string>;
@@ -601,6 +605,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
   });
   private readonly disposeController = new AbortController();
   private disposed = false;
+  private readonly worktreeInvalidationListeners = new Set<(repoRoot: string | null) => void>();
   private disposePromise: Promise<void> | null = null;
   private readonly snapshotUpdatedListeners = new Set<WorkspaceGitSnapshotUpdatedListener>();
   private readonly workspaceTargets = new Map<string, WorkspaceGitTarget>();
@@ -929,11 +934,22 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       : (snapshot.git.repoRoot ?? resolve(cwd));
   }
 
-  invalidateWorktrees(): void {
+  invalidateWorktrees(repoRoot?: string): void {
     this.assertNotDisposed();
     // Checkout paths can cache the same list under different roots, including bare repos.
     // Detach in-flight reads too, so a pre-mutation result cannot refill the cache.
     this.worktreeListCache.clear();
+    for (const listener of this.worktreeInvalidationListeners) {
+      listener(repoRoot ?? null);
+    }
+  }
+
+  /** Called after every `invalidateWorktrees`; `null` when the caller did not name a repo. */
+  subscribeToWorktreeInvalidation(listener: (repoRoot: string | null) => void): () => void {
+    this.worktreeInvalidationListeners.add(listener);
+    return () => {
+      this.worktreeInvalidationListeners.delete(listener);
+    };
   }
 
   async resolveDefaultBranch(

@@ -1368,6 +1368,23 @@ function resolveOperationBaseRef(input: {
   return input.storedBaseRef ?? input.requestedBaseRef ?? input.resolvedBaseRef;
 }
 
+export class UncommittedChangesError extends Error {
+  constructor(public readonly cwd: string) {
+    super(`${cwd} has uncommitted changes`);
+    this.name = "UncommittedChangesError";
+  }
+}
+
+/** Reads git directly; the workspace snapshot can lag behind files written seconds ago. */
+export async function assertWorkingTreeClean(
+  cwd: string,
+  context?: CheckoutContext,
+): Promise<void> {
+  if (await isWorkingTreeDirty(cwd, context)) {
+    throw new UncommittedChangesError(cwd);
+  }
+}
+
 async function isWorkingTreeDirty(cwd: string, context?: CheckoutContext): Promise<boolean> {
   const { stdout } = await getRunGitCommand(context)(["status", "--porcelain"], {
     cwd,

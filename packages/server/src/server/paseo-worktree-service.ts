@@ -119,6 +119,9 @@ async function createPaseoWorktreeWithPriority(
     });
 
     deps.github.invalidate({ cwd: createdWorktree.worktree.worktreePath });
+    if (createdWorktree.created) {
+      deps.workspaceGitService.invalidateWorktrees(createdWorktree.repoRoot);
+    }
 
     return {
       worktree: createdWorktree.worktree,

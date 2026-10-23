@@ -48,6 +48,7 @@ import {
   isForgeAuthError,
   mergeFromBase,
   mergeToBase,
+  assertWorkingTreeClean,
   pullCurrentBranch,
   pushCurrentBranch,
   listCheckoutCommits,
@@ -794,6 +795,9 @@ export class CheckoutSession {
         if (snapshot.git.isDirty) {
           throw new Error("Working directory has uncommitted changes.");
         }
+      }
+      if (msg.requireCleanSource) {
+        await assertWorkingTreeClean(cwd);
       }
 
       let baseRef = msg.baseRef ?? snapshot.git.baseRef;

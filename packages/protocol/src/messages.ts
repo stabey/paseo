@@ -2310,6 +2310,11 @@ export const CheckoutMergeRequestSchema = z.object({
   baseRef: z.string().optional(),
   strategy: z.enum(["merge", "squash"]).optional(),
   requireCleanTarget: z.boolean().optional(),
+  /**
+   * Refuse with NOT_ALLOWED when `cwd` has uncommitted or untracked changes, read from git at
+   * request time rather than the cached status. For callers that delete the checkout after merging.
+   */
+  requireCleanSource: z.boolean().optional(),
   requestId: z.string(),
 });
 

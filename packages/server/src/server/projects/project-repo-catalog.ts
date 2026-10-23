@@ -21,8 +21,13 @@ import { discoverRepos, type DiscoveredRepo } from "./repo-discovery.js";
  * Discovery is slow enough (one git invocation per repository) that project descriptors read from
  * this cache instead of scanning. The cache persists under `<paseoHome>/projects/` so a restarted
  * daemon serves the last known tree before its first rescan completes. A rescan runs when a project
- * is added, when its root path or repo settings change, and on explicit refresh.
+ * is added, when its root path or repo settings change, when Paseo adds or removes a worktree
+ * (`handleWorktreesChanged`), and on explicit refresh. Worktrees made with plain git show up on
+ * the next of those.
  */
+
+/** Coalesces the invalidations of one create or archive, which can fire more than once. */
+const WORKTREE_CHANGE_DEBOUNCE_MS = 250;
 
 const CachedCheckoutSchema = z.object({
   path: z.string(),
@@ -66,6 +71,8 @@ export interface ProjectRepoCatalogOptions {
   onChanged?: (project: PersistedProjectRecord) => void;
   /** Test seam. */
   discover?: typeof discoverRepos;
+  /** Test seam; defaults to WORKTREE_CHANGE_DEBOUNCE_MS. */
+  worktreeChangeDebounceMs?: number;
 }
 
 export class ProjectRepoCatalog {
@@ -73,6 +80,7 @@ export class ProjectRepoCatalog {
   private readonly logger: Logger;
   private readonly cache = new Map<string, CachedCatalog>();
   private readonly inflight = new Map<string, Promise<void>>();
+  private readonly pendingRescans = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly excludeRoots: string[];
   private readonly discover: typeof discoverRepos;
   private unsubscribe: (() => void) | null = null;
@@ -110,6 +118,40 @@ export class ProjectRepoCatalog {
   dispose(): void {
     this.unsubscribe?.();
     this.unsubscribe = null;
+    for (const timer of this.pendingRescans.values()) clearTimeout(timer);
+    this.pendingRescans.clear();
+  }
+
+  /**
+   * A worktree was added to or removed from the repository at `changedPath` (main root or any of its
+   * checkouts). Rescans the projects whose cached tree contains it; `null` rescans every cached
+   * project.
+   */
+  handleWorktreesChanged(changedPath: string | null): void {
+    for (const cached of this.cache.values()) {
+      if (changedPath === null || catalogContainsPath(cached, changedPath)) {
+        this.scheduleRescan(cached.projectId);
+      }
+    }
+  }
+
+  private scheduleRescan(projectId: string): void {
+    const existing = this.pendingRescans.get(projectId);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+      this.pendingRescans.delete(projectId);
+      void (async () => {
+        const project = await this.options.projectRegistry.get(projectId);
+        if (project && !project.archivedAt) await this.scan(project);
+      })().catch((error: unknown) => {
+        this.logger.warn(
+          { err: error, projectId },
+          "Repository rescan after worktree change failed",
+        );
+      });
+    }, this.options.worktreeChangeDebounceMs ?? WORKTREE_CHANGE_DEBOUNCE_MS);
+    timer.unref?.();
+    this.pendingRescans.set(projectId, timer);
   }
 
   /** Cached view merged with the project's persisted repo settings; null before the first scan. */
@@ -204,6 +246,14 @@ export class ProjectRepoCatalog {
   }
 }
 
+function catalogContainsPath(cached: CachedCatalog, target: string): boolean {
+  return cached.repos.some(
+    (repo) =>
+      areEquivalentPaths(repo.rootPath, target) ||
+      repo.checkouts.some((checkout) => areEquivalentPaths(checkout.path, target)),
+  );
+}
+
 function pinnedRelPaths(project: PersistedProjectRecord): string[] {
   return project.repos.filter((repo) => repo.pinned).map((repo) => repo.relPath);
 }
@@ -227,7 +277,6 @@ function mergeRepos(
   );
   return discovered.map((repo) => {
     const settings = settingsByPath.get(repo.relPath);
-    const adopted = settings?.adoptedWorktrees ?? [];
     return {
       relPath: repo.relPath,
       rootPath: repo.rootPath,
@@ -235,14 +284,13 @@ function mergeRepos(
       role: settings?.role ?? "normal",
       pinned: settings?.pinned ?? false,
       worktreeLocation: settings?.worktreeLocation ?? project.worktreeLocation ?? null,
-      // Managed = Paseo may archive and delete it: the main checkout never, Paseo-created and
-      // adopted worktrees yes, anything else only after adoption.
+      // Managed = Paseo may archive and delete it. Read from the same proof archive checks: Paseo
+      // metadata in the worktree's git admin dir, written on create and on adoption. The
+      // project's `adoptedWorktrees` list is not consulted: git reuses a path after a worktree is
+      // removed, and a plain-git worktree there must read as external again.
       checkouts: repo.checkouts.map(({ paseoMetadata, ...checkout }) => ({
         ...checkout,
-        managed:
-          checkout.isMain ||
-          paseoMetadata ||
-          adopted.some((entry) => areEquivalentPaths(entry, checkout.path)),
+        managed: checkout.isMain || paseoMetadata,
       })),
     };
   });

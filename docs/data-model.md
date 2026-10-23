@@ -37,7 +37,9 @@ worktree anywhere else is owned only when its metadata in git's admin dir
 worktree's parent. Paseo writes that record when a project's worktree location is `sibling`
 (`<repo parent>/<repo>.wt/<slug>`) or a chosen directory, and when a user-created worktree is
 adopted (`project.repo.adopt_worktree.request`). Plain `git worktree add` worktrees never get it,
-so the project repo catalog lists them as `managed: false` until adoption. The persisted workspace
+so the project repo catalog lists them as `managed: false` until adoption. The catalog reads the
+same metadata, never the project's `adoptedWorktrees` list: git reuses a removed worktree's path,
+and a new plain-git worktree there must read as external. The persisted workspace
 record stays the authority for archive: a `worktree` workspace with `isPaseoOwnedWorktree` deletes
 under the parent of its `worktreeRoot`, whichever kind of root that is.
 

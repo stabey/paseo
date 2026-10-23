@@ -884,6 +884,41 @@ describe("CheckoutSession", () => {
         },
       ]);
     });
+
+    it("reads git for a clean-source merge even when the cached snapshot says clean", async () => {
+      const repoDir = realpathSync(mkdtempSync(join(tmpdir(), "checkout-merge-source-")));
+      try {
+        execFileSync("git", ["init", "-q", "-b", "feature"], { cwd: repoDir });
+        writeFileSync(join(repoDir, "scratch.txt"), "not committed\n");
+        const { checkout, emitted } = makeCheckoutSession({
+          git: {
+            getSnapshot: async () => createGitSnapshot(repoDir, "feature", { isDirty: false }),
+          },
+        });
+
+        await checkout.handleCheckoutMergeRequest({
+          type: "checkout_merge_request",
+          cwd: repoDir,
+          baseRef: "main",
+          requireCleanSource: true,
+          requestId: "m3",
+        });
+
+        expect(emitted).toEqual([
+          {
+            type: "checkout_merge_response",
+            payload: {
+              cwd: repoDir,
+              success: false,
+              error: { code: "NOT_ALLOWED", message: `${repoDir} has uncommitted changes` },
+              requestId: "m3",
+            },
+          },
+        ]);
+      } finally {
+        rmSync(repoDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe("pr merge", () => {

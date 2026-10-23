@@ -24,9 +24,10 @@ export interface AdoptWorktreeDeps {
  * Brings a worktree somebody created with plain git under Paseo management.
  *
  * Two facts are written: a placement record in the worktree's git admin dir (what every
- * ownership check reads) and the path in the project's `adoptedWorktrees` (what the catalog
- * shows and what survives if git's admin dir is recreated). The worktree must be a linked
- * checkout of the repository; the main checkout is never adopted.
+ * ownership check and the catalog's `managed` flag read) and the path in the project's
+ * `adoptedWorktrees` (a record of the decision; it does not grant ownership, since git can reuse
+ * the path for an unrelated worktree later). The worktree must be a linked checkout of the
+ * repository; the main checkout is never adopted.
  */
 export async function adoptWorktree(
   deps: AdoptWorktreeDeps,

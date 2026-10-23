@@ -3762,7 +3762,7 @@ export class Session {
         },
         request,
       );
-      this.workspaceGitService.invalidateWorktrees();
+      this.workspaceGitService.invalidateWorktrees(request.worktreePath);
       // Workspaces already open in that worktree pick up ownership through their next snapshot.
       void this.gitMutation.notifyGitMutation(request.worktreePath, "create-worktree");
       if (this.projectRepoCatalog) await this.projectRepoCatalog.refresh(project);

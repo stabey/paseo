@@ -1264,6 +1264,7 @@ function createWorkspaceGitServiceStub(): WorkspaceGitService {
     scheduleRefreshForCwd: () => {},
     onWorkspaceStateMayHaveChanged: () => {},
     invalidateForge: () => {},
+    invalidateWorktrees: () => {},
     dispose: () => {},
   };
 }

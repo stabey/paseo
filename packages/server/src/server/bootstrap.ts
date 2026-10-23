@@ -1005,6 +1005,9 @@ export async function createPaseoDaemon(
     onChanged: (project) => wsServer?.publishProjectUpdate({ kind: "upsert", project }),
   });
   await projectRepoCatalog.start();
+  const unsubscribeWorktreeInvalidation = workspaceGitService.subscribeToWorktreeInvalidation(
+    (repoRoot) => projectRepoCatalog.handleWorktreesChanged(repoRoot),
+  );
   const workspaceReconciliation = new WorkspaceReconciliationService({
     serverId,
     projectRegistry,
@@ -1848,6 +1851,7 @@ export async function createPaseoDaemon(
     unsubscribePluginProviders();
     await hubRelationships.stop();
     workspaceReconciliation.dispose();
+    unsubscribeWorktreeInvalidation();
     projectRepoCatalog.dispose();
     scriptHealthMonitor.stop();
     // Freeze both ingress and registration before taking the agent closure snapshot.

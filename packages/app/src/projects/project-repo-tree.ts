@@ -24,6 +24,8 @@ export interface ProjectRepoTreeRepo {
   name: string;
   rootPath: string;
   role: ProjectRepoPayload["role"];
+  /** Where new worktrees go; null = the host's managed folder. */
+  worktreeLocation: ProjectRepoPayload["worktreeLocation"];
   checkouts: ProjectRepoTreeCheckout[];
 }
 
@@ -55,6 +57,7 @@ export function buildProjectRepoTree(input: {
       name: repo.relPath === "." ? baseName(repo.rootPath) : repo.relPath,
       rootPath: repo.rootPath,
       role: repo.role,
+      worktreeLocation: repo.worktreeLocation,
       checkouts: repo.checkouts
         .filter((checkout) => !checkout.bare)
         .map((checkout) => ({

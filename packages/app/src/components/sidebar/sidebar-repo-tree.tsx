@@ -1,12 +1,17 @@
 import { useCallback, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View, type PressableStateCallbackType } from "react-native";
-import { router, type Href } from "expo-router";
 import { ChevronDown, ChevronRight, FolderGit2, GitBranch } from "lucide-react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { isWeb } from "@/constants/platform";
 import { DensityIcon } from "@/components/ui/density-icon";
-import { PressHighlight } from "@/components/ui/press-highlight";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@/components/ui/context-menu";
+import {
+  CheckoutMenuItems,
+  RepoMenuItems,
+  useRepoTreeActions,
+  type RepoTreeActions,
+} from "@/components/sidebar/sidebar-repo-tree-menus";
 import { sidebarWorkspaceRowStyles } from "@/components/sidebar/sidebar-workspace-row-content";
 import type {
   SidebarProjectEntry,
@@ -21,7 +26,6 @@ import {
 import { useSessionStore } from "@/stores/session-store";
 import { selectProject } from "@/stores/session-store-hooks/selectors";
 import { density, densityIconBox } from "@/styles/density";
-import { buildNewWorkspaceRoute } from "@/utils/host-routes";
 
 /**
  * A project's workspaces grouped Repo > Checkout > workspace, behind the `sidebarRepoTree`
@@ -31,6 +35,7 @@ import { buildNewWorkspaceRoute } from "@/utils/host-routes";
  *
  * Reference repositories start collapsed. External checkouts (worktrees Paseo did not create or
  * adopt) are listed so the tree matches what git knows, but offer no action until adopted.
+ * Repository and checkout rows carry their actions in a context menu (right click, long press).
  */
 export function SidebarRepoTreeChildren({
   project,
@@ -86,23 +91,14 @@ export function SidebarRepoTreeChildren({
       return next;
     });
   }, []);
-  const openNewWorkspace = useCallback(
-    (checkout: ProjectRepoTreeCheckout) => {
-      if (!projectId) return;
-      onWorkspacePress?.();
-      router.navigate(
-        buildNewWorkspaceRoute({
-          serverId,
-          sourceDirectory: checkout.path,
-          displayName,
-          projectId,
-        }) as Href,
-      );
-    },
-    [displayName, onWorkspacePress, projectId, serverId],
-  );
+  const actions = useRepoTreeActions({
+    serverId,
+    projectId: projectId ?? "",
+    displayName,
+    onWorkspacePress,
+  });
 
-  if (!tree || tree.repos.length === 0) {
+  if (!projectId || !tree || tree.repos.length === 0) {
     return fallback;
   }
 
@@ -122,14 +118,11 @@ export function SidebarRepoTreeChildren({
         const expanded = expandedOverrides.get(repo.relPath) ?? repo.role !== "reference";
         return (
           <View key={repo.relPath} role="group" accessibilityLabel={repo.name}>
-            <RepoRow repo={repo} expanded={expanded} onToggle={toggleRepo} />
+            <RepoRow repo={repo} expanded={expanded} onToggle={toggleRepo} actions={actions} />
             {expanded
               ? repo.checkouts.map((checkout) => (
                   <View key={checkout.path}>
-                    <CheckoutRow
-                      checkout={checkout}
-                      onNewWorkspace={projectId ? openNewWorkspace : null}
-                    />
+                    <CheckoutRow repo={repo} checkout={checkout} actions={actions} />
                     {renderKeys(checkout.workspaceKeys)}
                   </View>
                 ))
@@ -154,74 +147,94 @@ function RepoRow({
   repo,
   expanded,
   onToggle,
+  actions,
 }: {
   repo: ProjectRepoTreeRepo;
   expanded: boolean;
   onToggle: (repo: ProjectRepoTreeRepo) => void;
+  actions: RepoTreeActions;
 }): ReactElement {
   const { t } = useTranslation();
   const handlePress = useCallback(() => onToggle(repo), [onToggle, repo]);
   return (
-    <PressHighlight
-      accessibilityRole={isWeb ? undefined : "button"}
-      accessibilityLabel={repo.name}
-      accessibilityState={expanded ? EXPANDED_STATE : COLLAPSED_STATE}
-      onPress={handlePress}
-      style={rowStyle}
-      testID={`sidebar-repo-row-${repo.relPath}`}
-    >
-      <View style={styles.iconSlot}>
-        <DensityIcon
-          icon={expanded ? ChevronDown : ChevronRight}
-          size="sm"
-          color="foregroundMuted"
-        />
-      </View>
-      <DensityIcon icon={FolderGit2} size="sm" color="foregroundMuted" />
-      <Text style={styles.repoName} numberOfLines={1}>
-        {repo.name}
-      </Text>
-      {repo.role === "reference" ? <Badge label={t("sidebar.repoTree.reference")} /> : null}
-    </PressHighlight>
+    <ContextMenu>
+      <ContextMenuTrigger
+        accessibilityRole={isWeb ? undefined : "button"}
+        accessibilityLabel={repo.name}
+        accessibilityState={expanded ? EXPANDED_STATE : COLLAPSED_STATE}
+        onPress={handlePress}
+        style={rowStyle}
+        testID={`sidebar-repo-row-${repo.relPath}`}
+      >
+        <View style={styles.iconSlot}>
+          <DensityIcon
+            icon={expanded ? ChevronDown : ChevronRight}
+            size="sm"
+            color="foregroundMuted"
+          />
+        </View>
+        <DensityIcon icon={FolderGit2} size="sm" color="foregroundMuted" />
+        <Text style={styles.repoName} numberOfLines={1}>
+          {repo.name}
+        </Text>
+        {repo.role === "reference" ? <Badge label={t("sidebar.repoTree.reference")} /> : null}
+      </ContextMenuTrigger>
+      <ContextMenuContent align="start" width={260} testID={`sidebar-repo-menu-${repo.relPath}`}>
+        <RepoMenuItems repo={repo} actions={actions} />
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
 function CheckoutRow({
+  repo,
   checkout,
-  onNewWorkspace,
+  actions,
 }: {
+  repo: ProjectRepoTreeRepo;
   checkout: ProjectRepoTreeCheckout;
-  onNewWorkspace: ((checkout: ProjectRepoTreeCheckout) => void) | null;
+  actions: RepoTreeActions;
 }): ReactElement {
   const { t } = useTranslation();
-  const actionable = onNewWorkspace !== null && (checkout.managed || checkout.isMain);
-  const handlePress = useCallback(() => onNewWorkspace?.(checkout), [checkout, onNewWorkspace]);
+  // External checkouts stay pressable so their menu (adopt) opens; the press itself does nothing.
+  const actionable = checkout.managed || checkout.isMain;
+  const handlePress = useCallback(() => {
+    if (actionable) actions.newWorkspace(checkout);
+  }, [actionable, actions, checkout]);
   const label = checkout.branch ?? (checkout.detached ? "HEAD" : checkout.path);
   return (
-    <PressHighlight
-      accessibilityRole={isWeb ? undefined : "button"}
-      accessibilityLabel={
-        actionable ? `${label}: ${t("sidebar.repoTree.newWorkspaceHere")}` : label
-      }
-      disabled={!actionable}
-      onPress={handlePress}
-      style={checkoutRowStyle}
-      testID={`sidebar-checkout-row-${checkout.path}`}
-    >
-      <View style={styles.iconSlot}>
-        <DensityIcon icon={GitBranch} size="sm" color="foregroundMuted" />
-      </View>
-      <Text style={styles.checkoutLabel} numberOfLines={1}>
-        {label}
-      </Text>
-      {checkout.isMain ? <Badge label={t("sidebar.repoTree.main")} /> : null}
-      {!checkout.isMain && !checkout.managed ? (
-        <Badge label={t("sidebar.repoTree.external")} />
-      ) : null}
-      {checkout.workspaceKeys.length > 0 ? (
-        <Text style={styles.count}>{checkout.workspaceKeys.length}</Text>
-      ) : null}
-    </PressHighlight>
+    <ContextMenu>
+      <ContextMenuTrigger
+        accessibilityRole={isWeb ? undefined : "button"}
+        accessibilityLabel={
+          actionable ? `${label}: ${t("sidebar.repoTree.newWorkspaceHere")}` : label
+        }
+        onPress={handlePress}
+        style={checkoutRowStyle}
+        testID={`sidebar-checkout-row-${checkout.path}`}
+      >
+        <View style={styles.iconSlot}>
+          <DensityIcon icon={GitBranch} size="sm" color="foregroundMuted" />
+        </View>
+        <Text style={styles.checkoutLabel} numberOfLines={1}>
+          {label}
+        </Text>
+        {checkout.isMain ? <Badge label={t("sidebar.repoTree.main")} /> : null}
+        {!checkout.isMain && !checkout.managed ? (
+          <Badge label={t("sidebar.repoTree.external")} />
+        ) : null}
+        {checkout.workspaceKeys.length > 0 ? (
+          <Text style={styles.count}>{checkout.workspaceKeys.length}</Text>
+        ) : null}
+      </ContextMenuTrigger>
+      <ContextMenuContent
+        align="start"
+        width={260}
+        testID={`sidebar-checkout-menu-${checkout.path}`}
+      >
+        <CheckoutMenuItems repo={repo} checkout={checkout} actions={actions} />
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 

@@ -1,6 +1,7 @@
 import {
   MergeConflictError,
   MergeFromBaseConflictError,
+  UncommittedChangesError,
   NotGitRepoError,
 } from "../utils/checkout-git.js";
 import { runGitCommand } from "../utils/run-git-command.js";
@@ -38,6 +39,9 @@ export function toCheckoutError(error: unknown): CheckoutErrorPayload {
   }
   if (error instanceof MergeFromBaseConflictError) {
     return { code: "MERGE_CONFLICT", message: error.message };
+  }
+  if (error instanceof UncommittedChangesError) {
+    return { code: "NOT_ALLOWED", message: error.message };
   }
   if (error instanceof Error) {
     return { code: "UNKNOWN", message: error.message };

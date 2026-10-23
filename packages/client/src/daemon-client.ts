@@ -93,6 +93,8 @@ import type {
   PaseoWorktreeListResponse,
   PaseoWorktreeArchiveResponse,
   ProjectIconSource,
+  ProjectRepoRole,
+  ProjectRepoWorktreeLocation,
   ProjectIconResponse,
   ProjectIconGetResponse,
   ProjectAddResponse,
@@ -3414,6 +3416,47 @@ export class DaemonClient {
     if (!payload.accepted) throw new Error(payload.error ?? "setProjectIcon rejected");
   }
 
+  /** Rescan the project folder; the refreshed descriptor arrives as a `project.update`. */
+  async refreshProjectRepos(projectId: string, requestId?: string): Promise<void> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"project.repos.refresh.response">({
+        requestId,
+        message: { type: "project.repos.refresh.request", projectId },
+      });
+    if (!payload.accepted) throw new Error(payload.error ?? "refreshProjectRepos rejected");
+  }
+
+  async setProjectRepoSettings(
+    input: {
+      projectId: string;
+      relPath: string;
+      role?: ProjectRepoRole;
+      pinned?: boolean;
+      worktreeLocation?: ProjectRepoWorktreeLocation | null;
+    },
+    requestId?: string,
+  ): Promise<void> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"project.repos.settings.set.response">({
+        requestId,
+        message: { type: "project.repos.settings.set.request", ...input },
+      });
+    if (!payload.accepted) throw new Error(payload.error ?? "setProjectRepoSettings rejected");
+  }
+
+  /** Take a worktree created outside Paseo under management so archive may delete it. */
+  async adoptProjectRepoWorktree(
+    input: { projectId: string; relPath: string; worktreePath: string },
+    requestId?: string,
+  ): Promise<void> {
+    const payload =
+      await this.sendNamespacedCorrelatedSessionRequest<"project.repo.adopt_worktree.response">({
+        requestId,
+        message: { type: "project.repo.adopt_worktree.request", ...input },
+      });
+    if (!payload.accepted) throw new Error(payload.error ?? "adoptProjectRepoWorktree rejected");
+  }
+
   async removeProject(
     projectId: string,
     requestId?: string,
@@ -4550,7 +4593,12 @@ export class DaemonClient {
 
   async checkoutMerge(
     cwd: string,
-    input: { baseRef?: string; strategy?: "merge" | "squash"; requireCleanTarget?: boolean },
+    input: {
+      baseRef?: string;
+      strategy?: "merge" | "squash";
+      requireCleanTarget?: boolean;
+      requireCleanSource?: boolean;
+    },
     requestId?: string,
   ): Promise<CheckoutMergePayload> {
     return this.sendCorrelatedSessionRequest({
@@ -4561,6 +4609,7 @@ export class DaemonClient {
         baseRef: input.baseRef,
         strategy: input.strategy,
         requireCleanTarget: input.requireCleanTarget,
+        ...(input.requireCleanSource ? { requireCleanSource: true } : {}),
       },
       responseType: "checkout_merge_response",
     });

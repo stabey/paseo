@@ -13,6 +13,7 @@ import {
 } from "../workspace-registry.js";
 import { ProjectRepoCatalog } from "./project-repo-catalog.js";
 import { discoverRepos } from "./repo-discovery.js";
+import { writePaseoWorktreePlacementMetadata } from "../../utils/worktree-metadata.js";
 
 function git(cwd: string, ...args: string[]): void {
   execFileSync("git", args, { cwd, stdio: "pipe" });
@@ -107,7 +108,7 @@ describe("ProjectRepoCatalog", () => {
     expect(existsSync(path.join(paseoHome, "projects", "prj_catalog.json"))).toBe(true);
   });
 
-  it("marks main and adopted checkouts as managed and plain git worktrees as external", async () => {
+  it("marks main and Paseo-owned checkouts as managed and plain git worktrees as external", async () => {
     await registry.update("prj_catalog", (record) => ({
       ...record,
       repos: [
@@ -135,13 +136,67 @@ describe("ProjectRepoCatalog", () => {
       ["wt-b", false],
     ]);
 
+    // A path in adoptedWorktrees alone does not grant ownership: git can reuse the path.
     await registry.update("prj_catalog", (record) =>
       adoptWorktree(record, path.join(base, "elsewhere-b")),
     );
-    const adopted = catalog
+    const listedOnly = catalog
       .snapshot((await registry.get("prj_catalog"))!)!
       .repos.find((repo) => repo.relPath === "app")!;
+    expect(listedOnly.checkouts.find((checkout) => checkout.branch === "wt-b")?.managed).toBe(
+      false,
+    );
+
+    writePaseoWorktreePlacementMetadata(path.join(base, "elsewhere-b"), {
+      worktreesRoot: base,
+      baseRefName: "main",
+    });
+    const adopted = (await catalog.refresh((await registry.get("prj_catalog"))!)).repos.find(
+      (repo) => repo.relPath === "app",
+    )!;
     expect(adopted.checkouts.find((checkout) => checkout.branch === "wt-b")?.managed).toBe(true);
+    catalog.dispose();
+  });
+
+  it("rescans a project when a worktree of one of its repositories changes", async () => {
+    let scans = 0;
+    let notifyChanged: () => void = () => {};
+    const catalog = new ProjectRepoCatalog({
+      paseoHome,
+      projectRegistry: registry,
+      logger,
+      worktreeChangeDebounceMs: 0,
+      onChanged: () => notifyChanged(),
+      discover: async (options) => {
+        scans += 1;
+        return discoverRepos(options);
+      },
+    });
+    await catalog.start();
+    const current = (await registry.get("prj_catalog"))!;
+    await catalog.refresh(current);
+    const scansBefore = scans;
+
+    catalog.handleWorktreesChanged(path.join(base, "unrelated"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(scans).toBe(scansBefore);
+
+    const changed = new Promise<void>((resolve) => {
+      notifyChanged = resolve;
+    });
+    git(
+      path.join(projectRoot, "app"),
+      "worktree",
+      "add",
+      "--quiet",
+      "-b",
+      "wt-c",
+      path.join(projectRoot, "app.wt", "c"),
+    );
+    catalog.handleWorktreesChanged(path.join(projectRoot, "app"));
+    await changed;
+    const app = catalog.snapshot(current)!.repos.find((repo) => repo.relPath === "app")!;
+    expect(app.checkouts.map((checkout) => checkout.branch)).toContain("wt-c");
     catalog.dispose();
   });
 
