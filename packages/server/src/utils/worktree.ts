@@ -32,7 +32,11 @@ import {
   writePaseoWorktreeMetadata,
   writePaseoWorktreeRuntimeMetadata,
 } from "./worktree-metadata.js";
-import { applyWorktreeIncludes } from "./worktree-includes.js";
+import {
+  applyWorktreeIncludes,
+  readWorktreeIncludesPlan,
+  type WorktreeIncludesPlan,
+} from "./worktree-includes.js";
 import { runGitCommand } from "./run-git-command.js";
 import { getCurrentBranch, resolveRepositoryDefaultBranch } from "./checkout-git.js";
 import { spawnProcess } from "./spawn.js";
@@ -43,6 +47,18 @@ import { expandTilde, getRealpathAwareRelativePath, isPathInsideRoot } from "./p
 import { terminateWithTreeKill } from "./tree-kill.js";
 
 export { slugify, validateBranchSlug } from "@getpaseo/protocol/branch-slug";
+
+/**
+ * A paseo.json that does not parse must not block `git worktree add`: setup reads the same file
+ * and reports the error on the workspace, which is where the user can see and fix it.
+ */
+function readIncludesPlanOrNone(sourceRoot: string): WorktreeIncludesPlan {
+  try {
+    return readWorktreeIncludesPlan(sourceRoot);
+  } catch {
+    return { include: [], linkDirectories: [] };
+  }
+}
 
 const execFileAsync = promisify(execFile);
 const READ_ONLY_GIT_ENV = {
@@ -1342,7 +1358,7 @@ export const createWorktree = async ({
   });
 
   await seedPaseoConfigFile({ sourceCwd: cwd, targetCwd: worktreePath });
-  await applyWorktreeIncludes({ sourceRoot: cwd, worktreePath });
+  await applyWorktreeIncludes({ sourceRoot: cwd, worktreePath, plan: readIncludesPlanOrNone(cwd) });
 
   return {
     branchName: sourcePlan.branchName,
