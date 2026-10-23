@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -27,7 +27,7 @@ describe("adoptWorktree", () => {
   };
 
   beforeAll(async () => {
-    base = realpathSync(mkdtempSync(path.join(tmpdir(), "adopt-worktree-")));
+    base = realpathSync.native(mkdtempSync(path.join(tmpdir(), "adopt-worktree-")));
     projectRoot = path.join(base, "project");
     const repo = path.join(projectRoot, "app");
     mkdirSync(repo, { recursive: true });
@@ -78,6 +78,28 @@ describe("adoptWorktree", () => {
     await expect(
       isPaseoOwnedWorktreeCwd(path.join(worktreePath, "nested"), { paseoHome }),
     ).resolves.toMatchObject({ allowed: true, worktreeRoot: base, worktreePath });
+  });
+
+  // Windows short temp paths and symlinks both name the folder differently from git's listing.
+  it("adopts a worktree named through a link to it", async () => {
+    const repo = path.join(projectRoot, "app");
+    git(repo, "worktree", "add", "--quiet", "-b", "linked", path.join(base, "linked-wt"));
+    const linkedPath = path.join(base, "link-to-linked-wt");
+    symlinkSync(
+      path.join(base, "linked-wt"),
+      linkedPath,
+      process.platform === "win32" ? "junction" : "dir",
+    );
+
+    const project = await adoptWorktree(deps, {
+      projectId: "prj_adopt",
+      relPath: "app",
+      worktreePath: linkedPath,
+    });
+
+    expect(project.repos.find((entry) => entry.relPath === "app")?.adoptedWorktrees).toContain(
+      linkedPath,
+    );
   });
 
   it("refuses the main checkout and paths that are not checkouts of the repository", async () => {

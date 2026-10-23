@@ -1,7 +1,7 @@
 import { dirname, resolve } from "node:path";
 
 import { writePaseoWorktreePlacementMetadata } from "../../utils/worktree-metadata.js";
-import { areEquivalentPaths } from "../../utils/path.js";
+import { areEquivalentPaths, createRealpathAwarePathMatcher } from "../../utils/path.js";
 import type { PersistedProjectRecord, ProjectRegistry } from "../workspace-registry.js";
 import { listCheckouts } from "./repo-discovery.js";
 
@@ -49,7 +49,9 @@ export async function adoptWorktree(
       `Not a repository of this project: ${input.relPath} (${error instanceof Error ? error.message : String(error)})`,
     );
   }
-  const checkout = checkouts.find((entry) => areEquivalentPaths(entry.path, worktreePath));
+  // Git lists long real paths; the request may name the same folder through a short path or link.
+  const isRequestedPath = createRealpathAwarePathMatcher(worktreePath);
+  const checkout = checkouts.find((entry) => isRequestedPath(entry.path));
   if (!checkout || checkout.isMain || checkout.bare) {
     throw new AdoptWorktreeError(
       "not_a_linked_checkout",
@@ -57,22 +59,23 @@ export async function adoptWorktree(
     );
   }
 
-  writePaseoWorktreePlacementMetadata(checkout.path, {
-    worktreesRoot: dirname(checkout.path),
+  // Recorded in the caller's form: git prints forward slashes on Windows.
+  writePaseoWorktreePlacementMetadata(worktreePath, {
+    worktreesRoot: dirname(worktreePath),
     baseRefName: await deps.resolveDefaultBranch(repoRoot),
   });
 
   const updated = await deps.projectRegistry.update(project.projectId, (record) => {
     const existing = record.repos.find((repo) => repo.relPath === input.relPath);
     const adoptedWorktrees = existing?.adoptedWorktrees ?? [];
-    if (adoptedWorktrees.some((entry) => areEquivalentPaths(entry, checkout.path))) return record;
+    if (adoptedWorktrees.some((entry) => areEquivalentPaths(entry, worktreePath))) return record;
     const next = {
       relPath: input.relPath,
       commonDirHash: existing?.commonDirHash ?? null,
       role: existing?.role ?? "normal",
       pinned: existing?.pinned ?? false,
       worktreeLocation: existing?.worktreeLocation ?? null,
-      adoptedWorktrees: [...adoptedWorktrees, checkout.path],
+      adoptedWorktrees: [...adoptedWorktrees, worktreePath],
     };
     return {
       ...record,

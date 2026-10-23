@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -41,7 +41,7 @@ describe("discoverRepos", () => {
   let origin: string;
 
   beforeAll(() => {
-    base = realpathSync(mkdtempSync(path.join(tmpdir(), "repo-discovery-")));
+    base = realpathSync.native(mkdtempSync(path.join(tmpdir(), "repo-discovery-")));
     root = path.join(base, "root");
     origin = path.join(base, "origin.git");
 
@@ -112,6 +112,21 @@ describe("discoverRepos", () => {
     expect(repos.some((repo) => repo.relPath === "fork-build")).toBe(false);
   });
 
+  // Windows hands out 8.3 short temp paths while git reports long ones; a symlinked project
+  // folder produces the same mismatch on every platform.
+  it("matches git's real paths when the project folder is reached through a link", async () => {
+    const linked = path.join(base, "linked-root");
+    symlinkSync(root, linked, process.platform === "win32" ? "junction" : "dir");
+    const { rootPath, repos } = await discoverRepos({
+      rootPath: linked,
+      excludeRoots: [path.join(root, "data", "worktrees")],
+    });
+    expect(rootPath).toBe(linked);
+    expect(repos.map((repo) => repo.relPath)).toEqual([".", "fork", "plugins/pstack", "upstream"]);
+    const fork = repos.find((repo) => repo.relPath === "fork");
+    expect(fork?.checkouts.map((checkout) => checkout.insideProject)).toEqual([true, true]);
+  });
+
   it("treats the project root's own repository as an ordinary repo", async () => {
     const { repos } = await discoverRepos({ rootPath: root });
     const self = repos.find((repo) => repo.relPath === ".");
@@ -149,9 +164,9 @@ describe("parseWorktreeList", () => {
       "bare",
       "",
     ].join("\n");
-    expect(parseWorktreeList(stdout, "/p")).toEqual([
+    expect(parseWorktreeList(stdout, path.resolve("/p"))).toEqual([
       {
-        path: "/p/repo",
+        path: path.resolve("/p/repo"),
         branch: "main",
         head: "aaaa",
         isMain: true,
@@ -160,7 +175,7 @@ describe("parseWorktreeList", () => {
         insideProject: true,
       },
       {
-        path: "/p/repo.wt/feature",
+        path: path.resolve("/p/repo.wt/feature"),
         branch: "feature",
         head: "bbbb",
         isMain: false,
@@ -169,7 +184,7 @@ describe("parseWorktreeList", () => {
         insideProject: true,
       },
       {
-        path: "/elsewhere/detached",
+        path: path.resolve("/elsewhere/detached"),
         branch: null,
         head: "cccc",
         isMain: false,
@@ -178,7 +193,7 @@ describe("parseWorktreeList", () => {
         insideProject: false,
       },
       {
-        path: "/p/bare.git",
+        path: path.resolve("/p/bare.git"),
         branch: null,
         head: null,
         isMain: false,

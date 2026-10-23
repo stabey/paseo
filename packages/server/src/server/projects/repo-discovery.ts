@@ -1,10 +1,10 @@
-import { promises as fs } from "node:fs";
+import { promises as fs, realpathSync } from "node:fs";
 import path from "node:path";
 
 import { runGitCommand } from "../../utils/run-git-command.js";
 import { deriveWorktreeProjectHash, getGitCommonDir } from "../../utils/worktree.js";
 import { readPaseoWorktreeMetadata } from "../../utils/worktree-metadata.js";
-import { areEquivalentPaths } from "../../utils/path.js";
+import { areEquivalentPaths, isRealpathInsideRoot } from "../../utils/path.js";
 
 /**
  * Repository discovery for a project folder.
@@ -89,7 +89,7 @@ export interface RepoDiscoveryResult {
 export async function discoverRepos(options: RepoDiscoveryOptions): Promise<RepoDiscoveryResult> {
   const rootPath = path.resolve(options.rootPath);
   const ignore = new Set(options.ignore ?? DEFAULT_REPO_DISCOVERY_IGNORE);
-  const excludeRoots = (options.excludeRoots ?? []).map((entry) => path.resolve(entry));
+  const excludeRoots = resolveExcludeRoots(rootPath, options.excludeRoots ?? []);
   const maxDepth = options.maxDepth ?? DEFAULT_REPO_DISCOVERY_MAX_DEPTH;
 
   const repoRoots: string[] = [];
@@ -171,6 +171,35 @@ async function isGitDirectory(gitEntry: string): Promise<boolean> {
   return (await classifyGitEntry(gitEntry)) === "directory";
 }
 
+/**
+ * Exclude roots in the form the walk sees directories: the walk descends from `rootPath` as given,
+ * which may be a Windows 8.3 short path or a symlink, while exclude roots usually come from git or
+ * config in their real form. Mapping them once keeps the walk free of per-directory realpath calls.
+ */
+function resolveExcludeRoots(rootPath: string, entries: readonly string[]): string[] {
+  const realRoot = tryRealpath(rootPath);
+  const roots = new Set<string>();
+  for (const entry of entries) {
+    const resolved = path.resolve(entry);
+    roots.add(resolved);
+    const realEntry = tryRealpath(resolved);
+    if (!realRoot || !realEntry) continue;
+    const relative = path.relative(realRoot, realEntry);
+    if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
+      roots.add(path.join(rootPath, relative));
+    }
+  }
+  return Array.from(roots);
+}
+
+function tryRealpath(target: string): string | null {
+  try {
+    return realpathSync.native(target);
+  } catch {
+    return null;
+  }
+}
+
 function isUnderAny(directory: string, roots: readonly string[]): boolean {
   return roots.some((root) => {
     const relative = path.relative(root, directory);
@@ -238,7 +267,9 @@ export function parseWorktreeList(stdout: string, projectRoot: string): ParsedCh
       isMain: checkouts.length === 0,
       detached: current.detached ?? false,
       bare: current.bare ?? false,
-      insideProject: isUnderAny(current.path, [projectRoot]),
+      // Git reports long, forward-slash paths; the project root may be a Windows 8.3 short
+      // path or reach the folder through a symlink, so containment compares real paths.
+      insideProject: isRealpathInsideRoot(projectRoot, current.path),
     });
   };
   for (const rawLine of stdout.split("\n")) {

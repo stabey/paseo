@@ -225,17 +225,19 @@ describe("paseo worktree manager", () => {
       worktreeSlug: "busy",
       paseoHome,
     });
-    await expect(
-      createWorktreePrimitive({
-        cwd: repoDir,
-        worktreeSlug: "busy-again",
-        source: { kind: "restore", branchName: "busy-branch", baseRef: null },
-        paseoHome,
-      }),
-    ).rejects.toMatchObject({
-      name: "BranchAlreadyCheckedOutError",
-      checkedOutAt: first.worktreePath,
-    });
+    const error = await createWorktreePrimitive({
+      cwd: repoDir,
+      worktreeSlug: "busy-again",
+      source: { kind: "restore", branchName: "busy-branch", baseRef: null },
+      paseoHome,
+    }).then(
+      () => null,
+      (rejection: unknown) => rejection,
+    );
+    expect(error).toMatchObject({ name: "BranchAlreadyCheckedOutError" });
+    // Git reports the long real path; the temp dir may be a Windows 8.3 short path.
+    const checkedOutAt = (error as { checkedOutAt: string }).checkedOutAt;
+    expect(createRealpathAwarePathMatcher(first.worktreePath)(checkedOutAt)).toBe(true);
   });
 
   it("rejects paths that are not under the paseo worktrees root", async () => {

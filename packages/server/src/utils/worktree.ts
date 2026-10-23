@@ -1897,5 +1897,9 @@ export async function findBranchCheckoutPath(
     cwd,
     envOverlay: READ_ONLY_GIT_ENV,
   });
-  return parseWorktreeList(stdout).find((entry) => entry.branchName === branchName)?.path ?? null;
+  const checkoutPath = parseWorktreeList(stdout).find(
+    (entry) => entry.branchName === branchName,
+  )?.path;
+  // Git prints forward slashes on Windows; report the path in the platform's own form.
+  return checkoutPath ? resolve(checkoutPath) : null;
 }
