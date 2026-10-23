@@ -13,7 +13,11 @@ import type {
 import { relative } from "node:path";
 import { isAbsolute } from "node:path";
 import { CreationService, type CreatedAgent } from "./creation/index.js";
-import type { CreationSnapshot, AgentCreateRequest } from "@getpaseo/protocol/messages";
+import type {
+  CreationSnapshot,
+  AgentCreateRequest,
+  ProjectManifest,
+} from "@getpaseo/protocol/messages";
 import type { MessageReceipts } from "./message-receipts/index.js";
 import equal from "fast-deep-equal";
 import { WorkspaceSetupObservation } from "./workspace-setup-observation.js";
@@ -171,6 +175,7 @@ import { wrapSpokenInput } from "./voice-config.js";
 import { isVoicePermissionAllowed } from "./voice-permission-policy.js";
 import type { ProjectRepoCatalog } from "./projects/project-repo-catalog.js";
 import { AdoptWorktreeError, adoptWorktree } from "./projects/adopt-worktree.js";
+import { buildProjectManifest } from "./projects/project-manifest.js";
 import {
   assertWorktreeSourceInProject,
   resolveProjectForWorktreeSource,
@@ -2476,6 +2481,8 @@ export class Session {
     switch (msg.type) {
       case "project.repos.refresh.request":
         return this.handleProjectReposRefreshRequest(msg);
+      case "project.manifest.request":
+        return this.handleProjectManifestRequest(msg);
       case "project.repos.settings.set.request":
         return this.handleProjectRepoSettingsSetRequest(msg);
       case "project.repo.adopt_worktree.request":
@@ -3681,6 +3688,35 @@ export class Session {
           error: getErrorMessageOr(error, "Failed to update agent"),
         },
       });
+    }
+  }
+
+  private async handleProjectManifestRequest(
+    request: Extract<SessionInboundMessage, { type: "project.manifest.request" }>,
+  ): Promise<void> {
+    const respond = (manifest: ProjectManifest | null, error: string | null) =>
+      this.emit({
+        type: "project.manifest.response",
+        payload: { requestId: request.requestId, projectId: request.projectId, manifest, error },
+      });
+    try {
+      const project = await this.projectRegistry.get(request.projectId);
+      if (!project || project.archivedAt) return respond(null, "Project not found");
+      if (!this.projectRepoCatalog) return respond(null, "Repository discovery unavailable");
+      const snapshot =
+        this.projectRepoCatalog.snapshot(project) ??
+        (await this.projectRepoCatalog.refresh(project));
+      respond(
+        await buildProjectManifest({
+          projectId: project.projectId,
+          rootPath: project.rootPath,
+          repos: snapshot.repos,
+        }),
+        null,
+      );
+    } catch (error) {
+      this.sessionLogger.error({ err: error }, "Failed to handle project.manifest.request");
+      respond(null, error instanceof Error ? error.message : "Failed to build project manifest");
     }
   }
 

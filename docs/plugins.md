@@ -432,6 +432,9 @@ Server entries register lifecycle observers with `server.on()` and request trans
 `server.before()`. The [public reference](../public-docs/plugins/reference.md#lifecycle-hooks)
 owns callback shapes, ordering, and failure behavior. `plugin-examples/lifecycle-logger` registers all
 eleven hooks; `plugin-examples/lifecycle-actions` demonstrates common automation callbacks.
+`plugin-examples/project-manifest` awaits `paseo.projects.manifest()` inside `before("agent.create")`
+to add a multi-repository project's checkouts to the system prompt; a `before` callback may call
+the daemon, since the request it transforms has not started yet.
 
 Emit from the operation owner, not a client subscription. Provider history replay must not trigger
 live hooks. Observers must not be awaited inside agent mutations: a callback can send a prompt or

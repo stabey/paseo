@@ -1020,6 +1020,17 @@ export const ProjectRepoAdoptWorktreeRequestSchema = z.object({
   requestId: z.string(),
 });
 
+/**
+ * Read-only summary of every repository and checkout in the project folder: branch, last
+ * commit and uncommitted changes. Meant for context injection (plugins, agents), not for the
+ * sidebar, which reads the cheaper `repos` on the project descriptor.
+ */
+export const ProjectManifestRequestSchema = z.object({
+  type: z.literal("project.manifest.request"),
+  projectId: z.string(),
+  requestId: z.string(),
+});
+
 export const ProjectIconSetRequestSchema = z.object({
   type: z.literal("project.icon.set.request"),
   projectId: z.string(),
@@ -3339,6 +3350,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ProjectReposRefreshRequestSchema,
   ProjectRepoSettingsSetRequestSchema,
   ProjectRepoAdoptWorktreeRequestSchema,
+  ProjectManifestRequestSchema,
   ProjectIconSetRequestSchema,
   ProjectRemoveRequestSchema,
   WorkspaceTitleSetRequestSchema,
@@ -3752,6 +3764,8 @@ export const ServerInfoStatusPayloadSchema = z
         projectSearchRoots: z.boolean().optional(),
         // Project folders expose discovered repositories and per-repo settings.
         projectRepos: z.boolean().optional(),
+        // project.manifest.request: per-checkout last commit and uncommitted changes.
+        projectManifest: z.boolean().optional(),
         // COMPAT(relayConfig): added in v0.2.6, remove gate after 2027-01-31.
         relayConfig: z.boolean().optional(),
         // COMPAT(pushTokenRevocation): added in v0.3.2, remove gate after 2027-02-10.
@@ -4379,6 +4393,45 @@ export const ProjectRepoPayloadSchema = z.object({
   pinned: z.boolean(),
   worktreeLocation: ProjectRepoWorktreeLocationSchema.nullable(),
   checkouts: z.array(ProjectRepoCheckoutPayloadSchema),
+});
+
+export const ProjectManifestCheckoutSchema = z.object({
+  path: z.string(),
+  branch: z.string().nullable(),
+  isMain: z.boolean(),
+  managed: z.boolean(),
+  lastCommit: z
+    .object({ sha: z.string(), subject: z.string(), committedAt: z.string() })
+    .nullable(),
+  /** Null when git could not be read for this checkout. */
+  uncommitted: z
+    .object({ files: z.number(), insertions: z.number(), deletions: z.number() })
+    .nullable(),
+});
+
+export const ProjectManifestRepoSchema = z.object({
+  relPath: z.string(),
+  rootPath: z.string(),
+  role: ProjectRepoRoleSchema,
+  checkouts: z.array(ProjectManifestCheckoutSchema),
+});
+
+export const ProjectManifestSchema = z.object({
+  projectId: z.string(),
+  rootPath: z.string(),
+  generatedAt: z.string(),
+  /** Hidden repositories are left out. */
+  repos: z.array(ProjectManifestRepoSchema),
+});
+
+export const ProjectManifestResponseSchema = z.object({
+  type: z.literal("project.manifest.response"),
+  payload: z.object({
+    requestId: z.string(),
+    projectId: z.string(),
+    manifest: ProjectManifestSchema.nullable(),
+    error: z.string().nullable(),
+  }),
 });
 
 export const WorkspaceProjectDescriptorPayloadSchema = z.object({
@@ -7174,6 +7227,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ProjectReposRefreshResponseSchema,
   ProjectRepoSettingsSetResponseSchema,
   ProjectRepoAdoptWorktreeResponseSchema,
+  ProjectManifestResponseSchema,
   ProjectIconSetResponseSchema,
   ProjectRemoveResponseSchema,
   WorkspaceTitleSetResponseSchema,
@@ -7535,6 +7589,9 @@ export type UpdateAgentRequestMessage = z.infer<typeof UpdateAgentRequestMessage
 export type ProjectIconSource = z.infer<typeof ProjectIconSourceSchema>;
 export type ProjectRenameRequest = z.infer<typeof ProjectRenameRequestSchema>;
 export type ProjectReposRefreshRequest = z.infer<typeof ProjectReposRefreshRequestSchema>;
+export type ProjectManifestRequest = z.infer<typeof ProjectManifestRequestSchema>;
+export type ProjectManifest = z.infer<typeof ProjectManifestSchema>;
+export type ProjectManifestResponse = z.infer<typeof ProjectManifestResponseSchema>;
 export type ProjectRepoSettingsSetRequest = z.infer<typeof ProjectRepoSettingsSetRequestSchema>;
 export type ProjectRepoAdoptWorktreeRequest = z.infer<typeof ProjectRepoAdoptWorktreeRequestSchema>;
 export type ProjectRepoRole = z.infer<typeof ProjectRepoRoleSchema>;

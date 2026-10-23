@@ -33,6 +33,7 @@ import type {
   SessionOutboundMessage,
   WorkspaceDescriptorPayload,
   WorkspaceCreateRequest,
+  ProjectManifest,
 } from "@getpaseo/protocol/messages";
 import { DaemonClient, type CreateAgentRequestOptions } from "./daemon-client.js";
 import {
@@ -200,6 +201,8 @@ export interface PaseoWorkspaceHandle {
 
 export interface PaseoProjectActions {
   list(options?: PaseoProjectListOptions): Promise<PaseoProjectListResult>;
+  /** Requires `server_info.features.projectManifest`. */
+  manifest(projectId: string): Promise<ProjectManifest>;
   subscribe(handler: PaseoProjectUpdateHandler): () => void;
 }
 
@@ -721,6 +724,7 @@ export function createPaseoApi(
     terminals,
     projects: {
       list: (options) => daemonClient.listProjects(options),
+      manifest: (projectId) => daemonClient.getProjectManifest(projectId),
       subscribe: (handler) => {
         return subscribeEvent("project.update", (message) => {
           if (message.type === "project.update") handler(message.payload);

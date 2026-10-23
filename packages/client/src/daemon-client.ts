@@ -95,6 +95,7 @@ import type {
   ProjectIconSource,
   ProjectRepoRole,
   ProjectRepoWorktreeLocation,
+  ProjectManifest,
   ProjectIconResponse,
   ProjectIconGetResponse,
   ProjectAddResponse,
@@ -3442,6 +3443,16 @@ export class DaemonClient {
         message: { type: "project.repos.settings.set.request", ...input },
       });
     if (!payload.accepted) throw new Error(payload.error ?? "setProjectRepoSettings rejected");
+  }
+
+  /** Repositories, checkouts, last commits and uncommitted changes of a project folder. */
+  async getProjectManifest(projectId: string, requestId?: string): Promise<ProjectManifest> {
+    const payload = await this.sendNamespacedCorrelatedSessionRequest<"project.manifest.response">({
+      requestId,
+      message: { type: "project.manifest.request", projectId },
+    });
+    if (!payload.manifest) throw new Error(payload.error ?? "getProjectManifest rejected");
+    return payload.manifest;
   }
 
   /** Take a worktree created outside Paseo under management so archive may delete it. */
