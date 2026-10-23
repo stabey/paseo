@@ -36,6 +36,7 @@ test.describe("Sidebar project filter", () => {
         "Show",
         "Project",
         "Show background",
+        "Repository tree (experimental)",
       ]);
       await closeSidebarDisplayPreferences(page);
 

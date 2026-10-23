@@ -29,6 +29,7 @@ test("project and workspace kebabs open action sheets on compact layouts", async
       "Show",
       "Project",
       "Show background",
+      "Repository tree (experimental)",
     ]);
     await closeMenuSheet(page);
 
