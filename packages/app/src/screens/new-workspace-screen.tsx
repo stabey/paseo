@@ -109,6 +109,7 @@ import {
 import { buildNewWorkspaceProjectIconTargets } from "./new-workspace/project-icon-targets";
 import { useNewWorkspaceProjectPicker } from "./new-workspace/project-picker";
 import { useNewWorkspaceRepoField } from "./new-workspace/repo-field";
+import { useExistingCheckoutNotice } from "./new-workspace/existing-checkout";
 import { useNewWorkspaceForm } from "./new-workspace/form";
 import { ImportSessionButton } from "./new-workspace/import-session-button";
 import { useImportSession } from "@/hooks/use-import-session";
@@ -1064,6 +1065,13 @@ export function NewWorkspaceScreen({
       supportsMultiplicity: supportsWorkspaceMultiplicity,
       worktreeSupport,
     });
+  const existingCheckout = useExistingCheckoutNotice({
+    serverId: selectedServerId,
+    repo: repoField.selectedRepo,
+    supportsWorkspaceMultiplicity,
+    effectiveIsolation,
+    selectedItem: pickerSelection.selectedItem,
+  });
 
   const branchSuggestionsQuery = useQuery({
     queryKey: [
@@ -1540,6 +1548,7 @@ export function NewWorkspaceScreen({
       profiles: terminalProfiles,
       disabled: isPending,
     },
+    existingCheckout,
   });
 
   const importSession = useImportSession({ serverId: selectedServerId });

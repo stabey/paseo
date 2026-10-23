@@ -1,8 +1,9 @@
 import { useCallback, useMemo, type ReactElement, type ReactNode, type RefObject } from "react";
-import { View } from "react-native";
+import { Text, View, type ViewStyle } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
+import { Button } from "@/components/ui/button";
 import { Combobox, type ComboboxOption, type ComboboxProps } from "@/components/ui/combobox";
 import { HostStatusDot } from "@/components/host-status-dot";
 import { HostPicker } from "@/components/hosts/host-picker";
@@ -84,6 +85,12 @@ export interface NewWorkspaceFormProps {
     profiles: readonly TerminalProfile[];
     disabled: boolean;
   };
+  /** The picked branch is already checked out; a new worktree would get a renamed branch. */
+  existingCheckout?: {
+    message: string;
+    actionLabel: string | null;
+    onAction: (() => void) | null;
+  } | null;
 }
 
 function hostOptionTestID(serverId: string): string {
@@ -173,7 +180,8 @@ function useRefRenderOption(itemById: Map<string, PickerItem>, isPending: boolea
  */
 export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement {
   const { t } = useTranslation();
-  const { isCompact, isPending, project, repo, host, isolation, base, launch } = props;
+  const { isCompact, isPending, project, repo, host, isolation, base, launch, existingCheckout } =
+    props;
   const variant: FieldTriggerVariant = isCompact ? "field" : "badge";
   const projectPicker = useProjectPicker(project, isPending);
   const isolationPicker = useIsolationPicker(isolation, isPending);
@@ -365,6 +373,8 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
     </>
   );
 
+  const notice = <ExistingCheckoutNotice notice={existingCheckout} disabled={isPending} />;
+
   if (isCompact) {
     return (
       <View testID="new-workspace-ref-picker-row" style={styles.compactStack}>
@@ -378,12 +388,13 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
             stack keeps one height and nothing above the composer jumps. */}
         {isolationField ? null : <View style={styles.reservedField} pointerEvents="none" />}
         {baseField ? null : <View style={styles.reservedField} pointerEvents="none" />}
+        {notice}
         {pickers}
       </View>
     );
   }
 
-  return (
+  const row = (
     <View testID="new-workspace-ref-picker-row" style={styles.desktopRow} pointerEvents="box-none">
       <View style={styles.desktopControl}>{projectField}</View>
       {repoField ? <View style={styles.desktopControl}>{repoField}</View> : null}
@@ -393,6 +404,44 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
       <View style={styles.launchSpacer} pointerEvents="none" />
       {launchField}
       {pickers}
+    </View>
+  );
+  return (
+    <>
+      {row}
+      <ExistingCheckoutNotice
+        notice={existingCheckout}
+        disabled={isPending}
+        style={styles.desktopNotice}
+      />
+    </>
+  );
+}
+
+function ExistingCheckoutNotice({
+  notice,
+  disabled,
+  style,
+}: {
+  notice: NewWorkspaceFormProps["existingCheckout"];
+  disabled: boolean;
+  style?: ViewStyle;
+}): ReactElement | null {
+  if (!notice) return null;
+  return (
+    <View testID="new-workspace-existing-checkout" style={[styles.notice, style]}>
+      <Text style={styles.noticeText}>{notice.message}</Text>
+      {notice.onAction && notice.actionLabel ? (
+        <Button
+          variant="outline"
+          size="sm"
+          onPress={notice.onAction}
+          disabled={disabled}
+          testID="new-workspace-existing-checkout-open"
+        >
+          {notice.actionLabel}
+        </Button>
+      ) : null}
     </View>
   );
 }
@@ -426,5 +475,21 @@ const styles = StyleSheet.create((theme) => ({
   // Pushes the launch control to the trailing edge of the desktop meta row.
   launchSpacer: {
     flex: 1,
+  },
+  desktopNotice: {
+    marginTop: -theme.spacing[2],
+    marginBottom: theme.spacing[4],
+    paddingHorizontal: theme.spacing[4],
+  },
+  notice: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: theme.spacing[2],
+  },
+  noticeText: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    flexShrink: 1,
   },
 }));

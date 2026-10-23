@@ -1389,6 +1389,11 @@ export const ru: TranslationResources = {
     },
   },
   newWorkspace: {
+    existingCheckout: {
+      message:
+        "Ветка {{branch}} уже извлечена в {{path}}. Новый worktree получит переименованную ветку.",
+      open: "Открыть это пространство",
+    },
     title: "Новое рабочее пространство",
     create: "Создать",
     isolation: {

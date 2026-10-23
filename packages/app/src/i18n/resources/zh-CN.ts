@@ -1358,6 +1358,10 @@ export const zhCN: TranslationResources = {
     },
   },
   newWorkspace: {
+    existingCheckout: {
+      message: "{{branch}} 已在 {{path}} 检出，新建 worktree 会改用重命名后的分支。",
+      open: "打开该工作区",
+    },
     title: "新建 workspace",
     create: "创建",
     isolation: {

@@ -57,12 +57,12 @@ export function selectableRepos(repos: readonly ProjectRepoPayload[]): ProjectRe
     );
 }
 
-function normalizePath(path: string): string {
+export function normalizePath(path: string): string {
   const unified = path.replace(/\\/g, "/");
   return unified.length > 1 ? unified.replace(/\/+$/, "") : unified;
 }
 
-function pathContains(root: string, candidate: string): boolean {
+export function pathContains(root: string, candidate: string): boolean {
   return candidate === root || candidate.startsWith(root.endsWith("/") ? root : `${root}/`);
 }
 

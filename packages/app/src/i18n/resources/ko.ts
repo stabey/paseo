@@ -1378,6 +1378,11 @@ export const ko: TranslationResources = {
     },
   },
   newWorkspace: {
+    existingCheckout: {
+      message:
+        "{{branch}}은(는) 이미 {{path}}에 체크아웃되어 있습니다. 새 worktree는 이름이 바뀐 브랜치를 사용합니다.",
+      open: "해당 워크스페이스 열기",
+    },
     title: "새 워크스페이스",
     create: "생성",
     isolation: {

@@ -1401,6 +1401,11 @@ export const fr: TranslationResources = {
     },
   },
   newWorkspace: {
+    existingCheckout: {
+      message:
+        "{{branch}} est déjà extraite dans {{path}}. Un nouveau worktree utiliserait une branche renommée.",
+      open: "Ouvrir cet espace",
+    },
     title: "Nouvel espace de travail",
     create: "Créer",
     isolation: {

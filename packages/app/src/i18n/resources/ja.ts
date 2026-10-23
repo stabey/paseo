@@ -1385,6 +1385,11 @@ export const ja: TranslationResources = {
     },
   },
   newWorkspace: {
+    existingCheckout: {
+      message:
+        "{{branch}} は {{path}} で既にチェックアウトされています。新しい worktree では名前を変えたブランチになります。",
+      open: "そのワークスペースを開く",
+    },
     title: "新しいワークスペース",
     create: "作成",
     isolation: {

@@ -1379,6 +1379,11 @@ export const en = {
     },
   },
   newWorkspace: {
+    existingCheckout: {
+      message:
+        "{{branch}} is already checked out at {{path}}. A new worktree would use a renamed branch.",
+      open: "Open that workspace",
+    },
     title: "New workspace",
     create: "Create",
     isolation: {

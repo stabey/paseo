@@ -1370,6 +1370,11 @@ export const ar: TranslationResources = {
     },
   },
   newWorkspace: {
+    existingCheckout: {
+      message:
+        "الفرع {{branch}} مستخرج بالفعل في {{path}}. ستستخدم شجرة العمل الجديدة فرعًا بإسم مختلف.",
+      open: "فتح مساحة العمل تلك",
+    },
     title: "مساحة عمل جديدة",
     create: "يخلق",
     isolation: {

@@ -1407,6 +1407,10 @@ export const es: TranslationResources = {
     },
   },
   newWorkspace: {
+    existingCheckout: {
+      message: "{{branch}} ya está en {{path}}. Un nuevo worktree usaría una rama renombrada.",
+      open: "Abrir ese espacio",
+    },
     title: "Nuevo espacio de trabajo",
     create: "Crear",
     isolation: {

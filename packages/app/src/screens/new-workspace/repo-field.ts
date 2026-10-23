@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { View } from "react-native";
+import type { ProjectRepoPayload } from "@getpaseo/protocol/messages";
 import type { HostProjectListItem } from "@/projects/host-projects";
 import type { NewWorkspaceFormProps } from "./form";
 import { useNewWorkspaceRepoPicker } from "./repo-picker";
@@ -19,6 +20,7 @@ export function useNewWorkspaceRepoField(input: {
   formProps: NewWorkspaceFormProps["repo"];
   /** Main checkout of the chosen repository; null when the project reports no repositories. */
   sourceDirectory: string | null;
+  selectedRepo: ProjectRepoPayload | null;
   hasRepos: boolean;
 } {
   const picker = useNewWorkspaceRepoPicker(input);
@@ -51,6 +53,7 @@ export function useNewWorkspaceRepoField(input: {
       onSelect,
     },
     sourceDirectory: picker.sourceDirectory,
+    selectedRepo: picker.selectedRepo,
     hasRepos: picker.hasRepos,
   };
 }

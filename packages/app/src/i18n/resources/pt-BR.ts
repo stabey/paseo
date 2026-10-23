@@ -1397,6 +1397,10 @@ export const ptBR: TranslationResources = {
     },
   },
   newWorkspace: {
+    existingCheckout: {
+      message: "{{branch}} já está em {{path}}. Um novo worktree usaria um branch renomeado.",
+      open: "Abrir esse espaço",
+    },
     title: "Novo workspace",
     create: "Criar",
     isolation: {
